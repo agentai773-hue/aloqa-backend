@@ -1,6 +1,6 @@
-const Assistant = require('../models/Assistant');
-const User = require('../models/User');
-const { getCategoryConfig, getAllCategories } = require('../data/agentCategories');
+const Assistant = require('../../models/Assistant');
+const User = require('../../models/User');
+const { getCategoryConfig, getAllCategories } = require('../../data/agentCategories');
 const axios = require('axios');
 
 /**

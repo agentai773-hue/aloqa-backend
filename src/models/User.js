@@ -86,6 +86,11 @@ const userSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+  role:{
+    type: String,
+    enum: ['sub-user', 'user'],//sub-user for site visit
+    default: 'user'
   }
 }, {
   timestamps: true,
