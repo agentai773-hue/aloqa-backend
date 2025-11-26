@@ -26,7 +26,11 @@ app.use(cors({
     'http://192.168.3.112:5173',
     'http://localhost:3000', // React dev server
     'http://localhost:8080', // Alternative frontend port
-    process.env.CLIENT_URL
+    'http://localhost:8081', // Alternative frontend port
+
+    process.env.CLIENT_URL,
+    process.env.CLIENT_URL1
+
   ].filter(Boolean), // Remove undefined values
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
