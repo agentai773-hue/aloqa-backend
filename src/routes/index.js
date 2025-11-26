@@ -6,6 +6,7 @@ const phoneNumberRoutes = require('../admin/routes/phoneNumberRoutes');
 const verifyEmailRoutes = require('./verifyEmail');
 const clientAuthRoutes = require('../clients/routes/authRoutes');
 const leadRoutes = require('../clients/routes/leadRoutes');
+const clientAssistantRoutes = require('../clients/routes/assistantRoutes');
 
 const router = express.Router();
 
@@ -44,6 +45,9 @@ router.use('/phone-numbers', phoneNumberRoutes);
 
 // Lead management routes
 router.use('/leads', leadRoutes);
+
+// Assistant management routes (client)
+router.use('/client-assistants', clientAssistantRoutes);
 
 router.use('/client-auth', clientAuthRoutes);
 
