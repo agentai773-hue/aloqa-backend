@@ -23,6 +23,7 @@ app.use(helmet()); // Security headers
 app.use(cors({
   origin: [
     'http://localhost:5173', // Vite dev server
+    'http://192.168.3.112:5173',
     'http://localhost:3000', // React dev server
     'http://localhost:8080', // Alternative frontend port
     process.env.CLIENT_URL
