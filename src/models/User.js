@@ -114,14 +114,8 @@ const userSchema = new mongoose.Schema({
   }
 });
 
-// Generate userId before saving
+// Generate userId before saving (if provided)
 userSchema.pre('save', async function(next) {
-  // Generate userId if not exists
-  if (!this.userId && this.isNew) {
-    const count = await mongoose.model('User').countDocuments();
-    this.userId = `USER${String(count + 1).padStart(6, '0')}`;
-  }
-
   // Only hash the password if it has been modified (or is new)
   if (!this.isModified('password')) return next();
 
