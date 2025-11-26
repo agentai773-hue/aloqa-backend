@@ -6,11 +6,18 @@ const { findUserByEmail } = require('../repositories/authRepository');
 async function loginUser(email, password) {
   const user = await findUserByEmail(email);
   
-  // Check if email exists
   if (!user) {
-    const error = new Error('Invalid email');
+    const error = new Error('This email does not exist.');
     error.code = 'INVALID_EMAIL';
     error.statusCode = 401;
+    throw error;
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    const error = new Error('Please enter a valid email address');
+    error.code = 'EMAIL_FORMAT_INVALID';
+    error.statusCode = 400;
     throw error;
   }
 
@@ -23,9 +30,18 @@ async function loginUser(email, password) {
     throw error;
   }
 
+  console.log("user",user)
+    if (user.isActive !== 1) {
+    
+    const error = new Error('please check your emmail to verify your account');
+    error.code = 'NOT_APPROVED';
+    error.statusCode = 403;
+    throw error;
+  }
+
   // Check if user is approved (isApproval must be 1)
   if (user.isApproval !== 1) {
-    const error = new Error('Your account has not been approved by admin. Please contact support.');
+    const error = new Error('Your account has not been approved by admin.');
     error.code = 'NOT_APPROVED';
     error.statusCode = 403;
     throw error;
@@ -35,5 +51,6 @@ async function loginUser(email, password) {
   const token = jwt.generateToken({ id: user._id, userId: user._id, email: user.email, role: user.role });
   return { token, user };
 }
+
 
 module.exports = { loginUser };

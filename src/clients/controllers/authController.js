@@ -5,14 +5,13 @@ const { loginUser } = require('../services/authService');
 async function login(req, res) {
   try {
     const { email, password } = req.body;
-    console.log("email",email,password)
     const { token, user } = await loginUser(email, password);
-    // Set httpOnly cookie so frontend can rely on cookies for auth
+    // Set cookie that can be managed by frontend for logout
     const cookieOptions = {
-      httpOnly: true,
+      httpOnly: false,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 10 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 10 * 24 * 60 * 60 * 1000, // 10 days
     };
     res.cookie('token', token, cookieOptions);
     res.json({ token, user });
@@ -22,6 +21,19 @@ async function login(req, res) {
       message: err.message,
       code: err.code 
     });
+  }
+}
+
+async function logout(req, res) {
+  try {
+    res.clearCookie('token', {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+    });
+    res.json({ message: 'Logged out successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Logout failed' });
   }
 }
 
@@ -46,4 +58,4 @@ async function verify(req, res) {
   }
 }
 
-module.exports = { login, verify };
+module.exports = { login, verify, logout };

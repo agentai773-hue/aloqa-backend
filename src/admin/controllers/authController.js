@@ -86,9 +86,6 @@ const getProfile = async (req, res) => {
   }
 };
 
-// @desc    Logout admin
-// @route   POST /api/auth/logout
-// @access  Private
 const logout = async (req, res) => {
   try {
     // Call service
