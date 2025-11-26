@@ -1,5 +1,5 @@
 const adminRepository = require('../repositories/adminRepository');
-const { generateToken, generateRefreshToken, verifyToken } = require('../utils/jwt');
+const { generateToken, generateRefreshToken, verifyToken } = require('../../utils/jwt');
 
 class AuthService {
   async login(email, password) {
@@ -52,7 +52,7 @@ class AuthService {
     
     // Find admin
     const admin = await adminRepository.findById(decoded.id);
-    const fullAdmin = await require('../models/Admin').findById(decoded.id);
+    const fullAdmin = await require('../../models/Admin').findById(decoded.id);
     
     if (!admin || !fullAdmin || fullAdmin.refreshToken !== token || !fullAdmin.isActive) {
       throw { status: 401, message: 'Invalid refresh token' };

@@ -2,8 +2,8 @@ const express = require('express');
 const router = express.Router();
 
 const { login, refreshToken, getProfile, logout } = require('../controllers/authController');
-const { loginValidation, refreshTokenValidation } = require('../validators/authValidator');
-const { protect } = require('../middleware/auth');
+const { loginValidation, refreshTokenValidation } = require('../../validators/authValidator');
+const { protect } = require('../../middleware/auth');
 
 // @route   POST /api/auth/login
 // @desc    Login admin

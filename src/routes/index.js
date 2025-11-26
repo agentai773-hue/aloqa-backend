@@ -1,7 +1,9 @@
 const express = require('express');
-const authRoutes = require('./authRoutes');
-const userRoutes = require('./userRoutes');
-const assistantRoutes = require('./assistantRoutes');
+const authRoutes = require('../admin/routes/authRoutes');
+const userRoutes = require('../admin/routes/userRoutes');
+const assistantRoutes = require('../admin/routes/assistantRoutes');
+const clientAuthRoutes = require('../clients/routes/authRoutes');
+const leadRoutes = require('../clients/routes/leadRoutes');
 
 const router = express.Router();
 
@@ -17,10 +19,20 @@ router.get('/health', (req, res) => {
 // Authentication routes
 router.use('/auth', authRoutes);
 
+
 // User management routes
 router.use('/users', userRoutes);
 
 // Assistant management routes
 router.use('/assistants', assistantRoutes);
+
+
+/// clients routes
+
+// Lead management routes
+router.use('/leads', leadRoutes);
+
+router.use('/client-auth', clientAuthRoutes);
+
 
 module.exports = router;
