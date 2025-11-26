@@ -1,26 +1,27 @@
 const Assistant = require('../../models/Assistant');
 const User = require('../../models/User');
-const { getCategoryConfig, getAllCategories } = require('../../data/agentCategories');
 const axios = require('axios');
 
 /**
- * Get all agent categories
+ * Helper function to convert camelCase object keys to snake_case for Bolna API
  */
-exports.getCategories = async (req, res) => {
-  try {
-    const categories = getAllCategories();
-    res.status(200).json({
-      success: true,
-      data: categories
-    });
-  } catch (error) {
-    console.error('Error fetching categories:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch agent categories',
-      error: error.message
-    });
+const camelToSnake = (obj) => {
+  if (obj === null || obj === undefined || typeof obj !== 'object') {
+    return obj;
   }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => camelToSnake(item));
+  }
+  
+  const snakeObj = {};
+  for (const key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+      snakeObj[snakeKey] = camelToSnake(obj[key]);
+    }
+  }
+  return snakeObj;
 };
 
 /**
@@ -43,6 +44,104 @@ exports.createAssistant = async (req, res) => {
       outputConfig,
       routes
     } = req.body;
+
+    // ===== VALIDATION SECTION =====
+    
+    // Validate required fields
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+
+    if (!agentName || agentName.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'Agent name is required'
+      });
+    }
+
+    if (!agentType) {
+      return res.status(400).json({
+        success: false,
+        message: 'Agent type is required'
+      });
+    }
+
+    if (!agentWelcomeMessage || agentWelcomeMessage.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'Agent welcome message is required'
+      });
+    }
+
+    if (!systemPrompt || systemPrompt.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'System prompt is required'
+      });
+    }
+
+    // Validate LLM configuration
+    if (!llmConfig || typeof llmConfig !== 'object') {
+      return res.status(400).json({
+        success: false,
+        message: 'LLM configuration is required'
+      });
+    }
+
+    if (!llmConfig.provider || !llmConfig.model) {
+      return res.status(400).json({
+        success: false,
+        message: 'LLM provider and model are required'
+      });
+    }
+
+    // Validate Synthesizer configuration
+    if (!synthesizerConfig || typeof synthesizerConfig !== 'object') {
+      return res.status(400).json({
+        success: false,
+        message: 'Synthesizer configuration is required'
+      });
+    }
+
+    if (!synthesizerConfig.provider || !synthesizerConfig.providerConfig) {
+      return res.status(400).json({
+        success: false,
+        message: 'Synthesizer provider and configuration are required'
+      });
+    }
+
+    // Validate Transcriber configuration
+    if (!transcriberConfig || typeof transcriberConfig !== 'object') {
+      return res.status(400).json({
+        success: false,
+        message: 'Transcriber configuration is required'
+      });
+    }
+
+    if (!transcriberConfig.provider || !transcriberConfig.model) {
+      return res.status(400).json({
+        success: false,
+        message: 'Transcriber provider and model are required'
+      });
+    }
+
+    // Validate Task configuration
+    if (!taskConfig || typeof taskConfig !== 'object') {
+      return res.status(400).json({
+        success: false,
+        message: 'Task configuration is required'
+      });
+    }
+
+    if (taskConfig.hangupAfterSilence === undefined || taskConfig.callTerminate === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: 'Task configuration must include hangupAfterSilence and callTerminate'
+      });
+    }
 
     // Validate user exists and has bearer token
     const user = await User.findById(userId);
@@ -68,6 +167,8 @@ exports.createAssistant = async (req, res) => {
       });
     }
 
+    // ===== END VALIDATION SECTION =====
+
     // Create assistant in database first
     const assistant = new Assistant({
       userId,
@@ -80,6 +181,8 @@ exports.createAssistant = async (req, res) => {
       synthesizerConfig,
       transcriberConfig,
       taskConfig,
+      inputConfig,
+      outputConfig,
       routes: routes || [],
       createdBy: req.admin._id,
       status: 'draft'
@@ -87,7 +190,15 @@ exports.createAssistant = async (req, res) => {
 
     await assistant.save();
 
-    // Prepare Bolna AI API request - EXACT structure from your Postman example
+    // Convert all camelCase configs to snake_case for Bolna API
+    const llmConfigSnake = camelToSnake(llmConfig);
+    const synthesizerConfigSnake = camelToSnake(synthesizerConfig);
+    const transcriberConfigSnake = camelToSnake(transcriberConfig);
+    const taskConfigSnake = camelToSnake(taskConfig);
+    const inputConfigSnake = camelToSnake(inputConfig);
+    const outputConfigSnake = camelToSnake(outputConfig);
+
+    // Prepare Bolna AI API request
     const bolnaPayload = {
       agent_config: {
         agent_name: agentName,
@@ -99,51 +210,51 @@ exports.createAssistant = async (req, res) => {
           task_type: 'conversation',
           tools_config: {
             llm_agent: {
-              agent_type: 'simple_llm_agent',
-              agent_flow_type: llmConfig.agent_flow_type || 'streaming',
+              agent_type: llmConfigSnake.agent_type || 'simple_llm_agent',
+              agent_flow_type: llmConfigSnake.agent_flow_type || 'streaming',
               llm_config: {
-                agent_flow_type: llmConfig.agent_flow_type || 'streaming',
-                provider: llmConfig.provider,
-                family: llmConfig.family || llmConfig.provider,
-                model: llmConfig.model,
-                temperature: llmConfig.temperature,
-                max_tokens: llmConfig.max_tokens,
-                top_p: llmConfig.top_p,
-                min_p: llmConfig.min_p || 0.1,
-                top_k: llmConfig.top_k || 0,
-                presence_penalty: llmConfig.presence_penalty || 0,
-                frequency_penalty: llmConfig.frequency_penalty || 0,
-                request_json: llmConfig.request_json !== false
+                agent_flow_type: llmConfigSnake.agent_flow_type || 'streaming',
+                provider: llmConfigSnake.provider,
+                family: llmConfigSnake.family || llmConfigSnake.provider,
+                model: llmConfigSnake.model,
+                temperature: llmConfigSnake.temperature,
+                max_tokens: llmConfigSnake.max_tokens,
+                top_p: llmConfigSnake.top_p,
+                min_p: llmConfigSnake.min_p || 0.1,
+                top_k: llmConfigSnake.top_k || 0,
+                presence_penalty: llmConfigSnake.presence_penalty || 0,
+                frequency_penalty: llmConfigSnake.frequency_penalty || 0,
+                request_json: llmConfigSnake.request_json !== false
               }
             },
             synthesizer: {
-              provider: synthesizerConfig.provider,
+              provider: synthesizerConfigSnake.provider,
               provider_config: {
-                voice: synthesizerConfig.provider_config.voice,
-                engine: synthesizerConfig.provider_config.engine,
-                sampling_rate: synthesizerConfig.provider_config.sampling_rate || '8000',
-                language: synthesizerConfig.provider_config.language
+                voice: synthesizerConfigSnake.provider_config.voice,
+                engine: synthesizerConfigSnake.provider_config.engine,
+                sampling_rate: synthesizerConfigSnake.provider_config.sampling_rate || '8000',
+                language: synthesizerConfigSnake.provider_config.language
               },
-              stream: synthesizerConfig.stream !== false,
-              buffer_size: synthesizerConfig.buffer_size || 60,
-              audio_format: synthesizerConfig.audio_format || 'wav'
+              stream: synthesizerConfigSnake.stream !== false,
+              buffer_size: synthesizerConfigSnake.buffer_size || 60,
+              audio_format: synthesizerConfigSnake.audio_format || 'wav'
             },
             transcriber: {
-              provider: transcriberConfig.provider,
-              model: transcriberConfig.model,
-              language: transcriberConfig.language,
-              stream: transcriberConfig.stream !== false,
-              sampling_rate: transcriberConfig.sampling_rate || 16000,
-              encoding: transcriberConfig.encoding || 'linear16',
-              endpointing: transcriberConfig.endpointing || 250
+              provider: transcriberConfigSnake.provider,
+              model: transcriberConfigSnake.model,
+              language: transcriberConfigSnake.language,
+              stream: transcriberConfigSnake.stream !== false,
+              sampling_rate: transcriberConfigSnake.sampling_rate || 16000,
+              encoding: transcriberConfigSnake.encoding || 'linear16',
+              endpointing: transcriberConfigSnake.endpointing || 250
             },
             input: {
-              provider: inputConfig.provider || 'plivo',
-              format: inputConfig.format || 'wav'
+              provider: inputConfigSnake?.provider || 'plivo',
+              format: inputConfigSnake?.format || 'wav'
             },
             output: {
-              provider: outputConfig.provider || 'plivo',
-              format: outputConfig.format || 'wav'
+              provider: outputConfigSnake?.provider || 'plivo',
+              format: outputConfigSnake?.format || 'wav'
             }
           },
           toolchain: {
@@ -151,11 +262,11 @@ exports.createAssistant = async (req, res) => {
             pipelines: [['transcriber', 'llm', 'synthesizer']]
           },
           task_config: {
-            hangup_after_silence: taskConfig.hangup_after_silence,
-            incremental_delay: taskConfig.incremental_delay,
-            number_of_words_for_interruption: taskConfig.number_of_words_for_interruption,
-            backchanneling: taskConfig.backchanneling,
-            call_terminate: taskConfig.call_terminate
+            hangup_after_silence: taskConfigSnake.hangup_after_silence,
+            incremental_delay: taskConfigSnake.incremental_delay,
+            number_of_words_for_interruption: taskConfigSnake.number_of_words_for_interruption,
+            backchanneling: taskConfigSnake.backchanneling,
+            call_terminate: taskConfigSnake.call_terminate
           }
         }]
       },
@@ -596,7 +707,7 @@ exports.updateAssistant = async (req, res) => {
 };
 
 /**
- * Delete assistant (hard delete from DB + Bolna AI)
+ * Delete assistant (hard delete from Bolna AI first, then DB)
  */
 exports.deleteAssistant = async (req, res) => {
   try {
@@ -609,7 +720,7 @@ exports.deleteAssistant = async (req, res) => {
       });
     }
 
-    // Delete from Bolna AI first if agentId exists
+    // CRITICAL: Delete from Bolna AI FIRST to prevent orphaned records
     if (assistant.agentId && assistant.userId?.bearerToken) {
       try {
         await axios.delete(
@@ -624,16 +735,21 @@ exports.deleteAssistant = async (req, res) => {
         console.log(`Successfully deleted agent ${assistant.agentId} from Bolna AI`);
       } catch (bolnaError) {
         console.error('Bolna AI delete error:', bolnaError.response?.data || bolnaError.message);
-        // Continue with DB deletion even if Bolna delete fails
+        // Return error - do NOT delete from DB if Bolna delete fails
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to delete assistant from Bolna AI. Database not modified.',
+          error: bolnaError.response?.data || bolnaError.message
+        });
       }
     }
 
-    // Delete from database
+    // Only delete from database if Bolna deletion succeeded
     await Assistant.findByIdAndDelete(req.params.id);
 
     res.status(200).json({
       success: true,
-      message: 'Assistant deleted successfully from both database and Bolna AI'
+      message: 'Assistant deleted successfully from Bolna AI and database'
     });
   } catch (error) {
     console.error('Error deleting assistant:', error);

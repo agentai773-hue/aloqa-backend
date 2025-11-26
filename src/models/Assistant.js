@@ -22,7 +22,24 @@ const assistantSchema = new mongoose.Schema({
   agentType: {
     type: String,
     required: [true, 'Agent type is required'],
-    enum: ['conversation', 'webhook', 'sales', 'support', 'appointment', 'survey', 'other'],
+    enum: [
+      'conversation', 
+      'webhook', 
+      'other',
+      'recruitment',
+      'customer_support',
+      'cart_abandonment',
+      'lead_qualification',
+      'onboarding',
+      'front_desk',
+      'cod_confirmation',
+      'announcements',
+      'reminders',
+      'surveys',
+      'property_tech',
+      'Summarization',
+      'Extraction'
+    ],
     default: 'conversation'
   },
   agentWelcomeMessage: {
@@ -38,30 +55,71 @@ const assistantSchema = new mongoose.Schema({
   
   // LLM Configuration
   llmConfig: {
+    agentType: {
+      type: String,
+      default: 'simple_llm_agent',
+      enum: ['simple_llm_agent']
+    },
+    agentFlowType: {
+      type: String,
+      default: 'streaming',
+      enum: ['streaming', 'non-streaming']
+    },
     provider: {
       type: String,
       default: 'openai',
       enum: ['openai', 'anthropic', 'groq', 'together']
     },
+    family: {
+      type: String,
+      default: 'openai'
+    },
     model: {
       type: String,
-      default: 'gpt-3.5-turbo'
+      default: 'gpt-3.5-turbo',
+      enum: ['gpt-4o', 'gpt-4', 'gpt-3.5-turbo']
     },
     maxTokens: {
       type: Number,
-      default: 150,
-      min: 1,
-      max: 4096
+      default: 100,
+      min: 0,
+      max: 4000
     },
     temperature: {
       type: Number,
-      default: 0.1,
+      default: 0.4,
       min: 0,
-      max: 2
+      max: 1
     },
     topP: {
       type: Number,
-      default: 0.9
+      default: 0.9,
+      min: 0.1,
+      max: 1
+    },
+    minP: {
+      type: Number,
+      default: 0.1,
+      min: 0.1,
+      max: 1
+    },
+    topK: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 50
+    },
+    presencePenalty: {
+      type: Number,
+      default: 0
+    },
+    frequencyPenalty: {
+      type: Number,
+      default: 0
+    },
+    requestJson: {
+      type: Boolean,
+      default: true
     }
   },
   
@@ -70,19 +128,43 @@ const assistantSchema = new mongoose.Schema({
     provider: {
       type: String,
       default: 'polly',
-      enum: ['polly', 'elevenlabs', 'deepgram', 'xtts']
+      enum: ['polly', 'elevenlabs', 'elevenlab', 'deepgram', 'xtts']
     },
-    voice: {
-      type: String,
-      default: 'Matthew'
+    providerConfig: {
+      voice: {
+        type: String,
+        default: 'Kajal'
+      },
+      engine: {
+        type: String,
+        default: 'neural',
+        enum: ['neural', 'generative', 'standard']
+      },
+      samplingRate: {
+        type: String,
+        default: '8000'
+      },
+      language: {
+        type: String,
+        default: 'hi-IN'
+      },
+      model: {
+        type: String,
+        default: null
+      }
     },
-    language: {
-      type: String,
-      default: 'en-US'
+    stream: {
+      type: Boolean,
+      default: true
     },
-    engine: {
+    bufferSize: {
+      type: Number,
+      default: 60
+    },
+    audioFormat: {
       type: String,
-      default: 'generative'
+      default: 'wav',
+      enum: ['wav', 'mp3']
     }
   },
   
@@ -91,7 +173,7 @@ const assistantSchema = new mongoose.Schema({
     provider: {
       type: String,
       default: 'deepgram',
-      enum: ['deepgram', 'whisper']
+      enum: ['deepgram', 'whisper', 'azure', 'google', 'sarvam']
     },
     model: {
       type: String,
@@ -99,7 +181,53 @@ const assistantSchema = new mongoose.Schema({
     },
     language: {
       type: String,
-      default: 'en'
+      default: 'hi'
+    },
+    stream: {
+      type: Boolean,
+      default: true
+    },
+    samplingRate: {
+      type: Number,
+      default: 16000,
+      min: 1000,
+      max: 48000
+    },
+    encoding: {
+      type: String,
+      default: 'linear16'
+    },
+    endpointing: {
+      type: Number,
+      default: 250,
+      min: 0,
+      max: 1000
+    }
+  },
+  
+  // Input/Output Configuration
+  inputConfig: {
+    provider: {
+      type: String,
+      default: 'plivo',
+      enum: ['plivo', 'exotel', 'twilio']
+    },
+    format: {
+      type: String,
+      default: 'wav',
+      enum: ['wav', 'mp3']
+    }
+  },
+  outputConfig: {
+    provider: {
+      type: String,
+      default: 'plivo',
+      enum: ['plivo', 'exotel', 'twilio']
+    },
+    format: {
+      type: String,
+      default: 'wav',
+      enum: ['wav', 'mp3']
     }
   },
   
@@ -107,7 +235,9 @@ const assistantSchema = new mongoose.Schema({
   taskConfig: {
     hangupAfterSilence: {
       type: Number,
-      default: 10,
+      default: 6,
+      min: 0,
+      max: 10,
       comment: 'Seconds of silence before hanging up'
     },
     callTerminate: {
@@ -117,17 +247,58 @@ const assistantSchema = new mongoose.Schema({
     },
     incrementalDelay: {
       type: Number,
-      default: 400
+      default: 400,
+      min: 10,
+      max: 2000,
+      comment: 'Incremental delay in milliseconds'
     },
     numberOfWordsForInterruption: {
       type: Number,
-      default: 2
+      default: 2,
+      min: 1,
+      max: 10,
+      comment: 'Number of words for interruption'
     },
     backchanneling: {
       type: Boolean,
       default: false
     },
     ambientNoise: {
+      type: Boolean,
+      default: false
+    },
+    hangupAfterLLMCall: {
+      type: Boolean,
+      default: false
+    },
+    callCancellationPrompt: {
+      type: String,
+      default: null
+    },
+    backchannelingMessageGap: {
+      type: Number,
+      default: 5
+    },
+    backchannelingStartDelay: {
+      type: Number,
+      default: 5
+    },
+    ambientNoiseTrack: {
+      type: String,
+      default: 'office-ambience'
+    },
+    voicemail: {
+      type: Boolean,
+      default: false
+    },
+    inboundLimit: {
+      type: Number,
+      default: -1
+    },
+    whitelistPhoneNumbers: [{
+      type: String
+    }],
+    disallowUnknownNumbers: {
       type: Boolean,
       default: false
     }

@@ -84,10 +84,18 @@ const userSchema = new mongoose.Schema({
     type: Date
   },
   isActive: {
-  type: Number,
-     enum: [0, 1],
+    type: Number,
+    enum: [0, 1],
     default: 0,
     comment: '0 = Not Active (Email not verified), 1 = Active (Email verified)'
+  },
+  verificationToken: {
+    type: String,
+    default: null
+  },
+  verificationTokenExpires: {
+    type: Date,
+    default: null
   },
   role:{
     type: String,
@@ -106,14 +114,8 @@ const userSchema = new mongoose.Schema({
   }
 });
 
-// Generate userId before saving
+// Generate userId before saving (if provided)
 userSchema.pre('save', async function(next) {
-  // Generate userId if not exists
-  if (!this.userId && this.isNew) {
-    const count = await mongoose.model('User').countDocuments();
-    this.userId = `USER${String(count + 1).padStart(6, '0')}`;
-  }
-
   // Only hash the password if it has been modified (or is new)
   if (!this.isModified('password')) return next();
 
