@@ -2,6 +2,8 @@ const express = require('express');
 const authRoutes = require('../admin/routes/authRoutes');
 const userRoutes = require('../admin/routes/userRoutes');
 const assistantRoutes = require('../admin/routes/assistantRoutes');
+const phoneNumberRoutes = require('../admin/routes/phoneNumberRoutes');
+const verifyEmailRoutes = require('./verifyEmail');
 
 const router = express.Router();
 
@@ -14,6 +16,11 @@ router.get('/health', (req, res) => {
   });
 });
 
+// Email verification routes (Public)
+router.use('/verify-email', verifyEmailRoutes);
+
+// admin routes 
+
 // Authentication routes
 router.use('/auth', authRoutes);
 
@@ -22,5 +29,13 @@ router.use('/users', userRoutes);
 
 // Assistant management routes
 router.use('/assistants', assistantRoutes);
+
+// Phone number management routes
+router.use('/phone-numbers', phoneNumberRoutes);
+
+
+
+// user routes
+
 
 module.exports = router;

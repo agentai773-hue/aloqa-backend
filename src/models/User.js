@@ -84,8 +84,18 @@ const userSchema = new mongoose.Schema({
     type: Date
   },
   isActive: {
-    type: Boolean,
-    default: true
+    type: Number,
+    enum: [0, 1],
+    default: 0,
+    comment: '0 = Not Active (Email not verified), 1 = Active (Email verified)'
+  },
+  verificationToken: {
+    type: String,
+    default: null
+  },
+  verificationTokenExpires: {
+    type: Date,
+    default: null
   },
   role:{
     type: String,

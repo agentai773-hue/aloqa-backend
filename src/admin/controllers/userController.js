@@ -153,16 +153,20 @@ const toggleUserApproval = async (req, res) => {
   }
 };
 
-// @desc    Delete user (soft delete)
+// @desc    Delete user and all related data
 // @route   DELETE /api/users/:id
 // @access  Private (Admin only)
 const deleteUser = async (req, res) => {
   try {
-    await userService.deleteUser(req.params.id);
+    const result = await userService.deleteUser(req.params.id);
 
     res.json({
       success: true,
-      message: 'User deleted successfully'
+      message: result.message,
+      data: {
+        deletedAssistants: result.deletedData.assistants,
+        deletedPhoneNumbers: result.deletedData.phoneNumbers
+      }
     });
 
   } catch (error) {
@@ -197,6 +201,31 @@ const getUserStats = async (req, res) => {
   }
 };
 
+// @desc    Manually verify user email (admin action)
+// @route   PATCH /api/users/:id/verify-email
+// @access  Private (Admin only)
+const manuallyVerifyUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await userService.manuallyVerifyUser(id);
+
+    res.json({
+      success: true,
+      message: 'User email verified successfully',
+      data: { user }
+    });
+
+  } catch (error) {
+    console.error('Manual verification error:', error);
+    const status = error.status || 500;
+    res.status(status).json({
+      success: false,
+      message: error.message || 'Server error verifying user'
+    });
+  }
+};
+
 module.exports = {
   createUser,
   getAllUsers,
@@ -204,5 +233,6 @@ module.exports = {
   updateUser,
   toggleUserApproval,
   deleteUser,
-  getUserStats
+  getUserStats,
+  manuallyVerifyUser
 };

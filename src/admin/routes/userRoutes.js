@@ -54,4 +54,7 @@ router.delete('/:id', userController.deleteUser);
 // Toggle approval
 router.patch('/:id/approval', userController.toggleUserApproval);
 
+// Manual email verification (admin action)
+router.patch('/:id/verify-email', userController.manuallyVerifyUser);
+
 module.exports = router;

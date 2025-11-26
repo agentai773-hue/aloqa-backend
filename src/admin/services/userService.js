@@ -1,4 +1,7 @@
 const userRepository = require('../repositories/userRepository');
+const { generateVerificationToken, sendVerificationEmail } = require('../../utils/emailService');
+const Assistant = require('../../models/Assistant');
+const PhoneNumber = require('../../models/PhoneNumber');
 
 class UserService {
   async createUser(userData) {
@@ -16,8 +19,27 @@ class UserService {
     // Remove confirmPassword before saving
     delete userData.confirmPassword;
 
+    // Generate verification token
+    const verificationToken = generateVerificationToken();
+    const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    // Add verification data to user
+    userData.verificationToken = verificationToken;
+    userData.verificationTokenExpires = verificationTokenExpires;
+    userData.isActive = 0; // Not active until email verified
+
     // Create user
     const user = await userRepository.create(userData);
+
+    // Send verification email (don't block user creation if email fails)
+    try {
+      await sendVerificationEmail(user, verificationToken);
+      console.log('Verification email sent to:', user.email);
+    } catch (emailError) {
+      console.error('Failed to send verification email:', emailError);
+      // Continue - user is created but email failed
+    }
+
     return user;
   }
 
@@ -84,8 +106,31 @@ class UserService {
       throw { status: 404, message: 'User not found' };
     }
 
+    // Get counts of related data before deletion
+    const assistantsCount = await Assistant.countDocuments({ userId: user.userId });
+    const phoneNumbersCount = await PhoneNumber.countDocuments({ userId: user.userId });
+
+    // Delete all related data (cascading delete)
+    // Delete all assistants created by this user
+    if (assistantsCount > 0) {
+      await Assistant.deleteMany({ userId: user.userId });
+    }
+
+    // Delete all phone numbers assigned to this user
+    if (phoneNumbersCount > 0) {
+      await PhoneNumber.deleteMany({ userId: user.userId });
+    }
+
+    // Finally delete the user
     await userRepository.delete(id);
-    return { message: 'User deleted successfully' };
+
+    return { 
+      message: 'User deleted successfully',
+      deletedData: {
+        assistants: assistantsCount,
+        phoneNumbers: phoneNumbersCount
+      }
+    };
   }
 
   async getUserStats() {
@@ -98,6 +143,37 @@ class UserService {
       approvedUsers,
       pendingUsers
     };
+  }
+
+  async manuallyVerifyUser(id) {
+    const user = await userRepository.findById(id);
+    if (!user) {
+      throw { status: 404, message: 'User not found' };
+    }
+
+    if (user.isActive === 1) {
+      throw { status: 400, message: 'User email is already verified' };
+    }
+
+    // Set isActive to 1 and clear verification token
+    const updateData = {
+      isActive: 1,
+      verificationToken: null,
+      verificationTokenExpires: null
+    };
+
+    const updatedUser = await userRepository.update(id, updateData);
+
+    // Send welcome email
+    const { sendWelcomeEmail } = require('../../utils/emailService');
+    try {
+      await sendWelcomeEmail(updatedUser);
+    } catch (emailError) {
+      console.error('Failed to send welcome email:', emailError);
+      // Don't throw - user is verified even if email fails
+    }
+
+    return updatedUser;
   }
 }
 

@@ -7,13 +7,6 @@ const { protect } = require('../../middleware/auth');
 router.use(protect);
 
 /**
- * @route   GET /api/assistants/categories
- * @desc    Get all agent categories
- * @access  Private (Admin only)
- */
-router.get('/categories', assistantController.getCategories);
-
-/**
  * @route   POST /api/assistants
  * @desc    Create a new assistant
  * @access  Private (Admin only)

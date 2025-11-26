@@ -1,10 +1,11 @@
 const User = require('../../models/User');
 
 class UserRepository {
-  async findAll(filters = {}) {
-    const query = { isActive: true, ...filters };
-    return await User.find(query).select('-password -otp').sort({ createdAt: -1 });
-  }
+async findAll(filters = {}) {
+  const query = { ...filters };
+  return await User.find(query).select('-password -otp').sort({ createdAt: -1 });
+}
+
 
   async findById(id) {
     return await User.findById(id).select('-password -otp');
@@ -45,11 +46,8 @@ class UserRepository {
   }
 
   async delete(id) {
-    return await User.findByIdAndUpdate(
-      id,
-      { isActive: false },
-      { new: true }
-    );
+    // Actually delete from database instead of soft delete
+    return await User.findByIdAndDelete(id);
   }
 
   async countUsers(filters = {}) {
