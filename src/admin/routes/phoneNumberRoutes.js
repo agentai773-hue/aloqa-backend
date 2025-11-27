@@ -4,20 +4,19 @@ const { protect } = require('../../middleware/auth');
 const {
   searchPhoneNumbers,
   buyPhoneNumber,
+  getPurchasedPhoneNumbers,
   assignPhoneNumber,
-  getAllPhoneNumbers,
-  deletePhoneNumber,
-  unassignPhoneNumber
+  getAssignedPhoneNumbers
 } = require('../controllers/phoneNumberController');
 
 // All routes require admin authentication
 router.use(protect);
 
+// Get purchased phone numbers from Bolna
+router.get('/purchased', getPurchasedPhoneNumbers);
+
 // Search available phone numbers from Bolna
 router.get('/search', searchPhoneNumbers);
-
-// Get all phone numbers (with optional filters)
-router.get('/', getAllPhoneNumbers);
 
 // Buy a phone number from Bolna
 router.post('/buy', buyPhoneNumber);
@@ -25,10 +24,7 @@ router.post('/buy', buyPhoneNumber);
 // Assign phone number to user
 router.post('/assign', assignPhoneNumber);
 
-// Unassign phone number from user
-router.patch('/:id/unassign', unassignPhoneNumber);
-
-// Delete phone number (from Bolna first, then database)
-router.delete('/:id', deletePhoneNumber);
+// Get assigned phone numbers
+router.get('/assigned', getAssignedPhoneNumbers);
 
 module.exports = router;

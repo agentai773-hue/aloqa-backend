@@ -1,15 +1,33 @@
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 
-// Configure email transporter (you'll need to update with your SMTP settings)
+// Check if email is configured
+const isEmailConfigured = () => {
+  return !!(
+    process.env.EMAIL_HOST &&
+    process.env.EMAIL_PORT &&
+    process.env.EMAIL_USER &&
+    process.env.EMAIL_PASSWORD
+  );
+};
+
+// Configure email transporter
 const createTransporter = () => {
+  if (!isEmailConfigured()) {
+    console.warn('⚠️  Email not configured. Set EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASSWORD in .env');
+    return null;
+  }
+
   return nodemailer.createTransport({
-    host: process.env.EMAIL_HOST ,
-    port: process.env.EMAIL_PORT,
-    secure: false, // true for 465, false for other ports
+    host: process.env.EMAIL_HOST,
+    port: parseInt(process.env.EMAIL_PORT),
+    secure: process.env.EMAIL_PORT === '465', // true for 465, false for other ports
     auth: {
-      user: process.env.EMAIL_USER, // Your email
-      pass: process.env.EMAIL_PASSWORD // Your email password or app-specific password
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASSWORD
+    },
+    tls: {
+      rejectUnauthorized: false // Allow self-signed certificates in development
     }
   });
 };
@@ -21,6 +39,13 @@ const generateVerificationToken = () => {
 
 // Send verification email
 const sendVerificationEmail = async (user, verificationToken) => {
+  // Check if email is configured - REQUIRED
+  if (!isEmailConfigured()) {
+    const errorMsg = 'Email configuration missing. Please set EMAIL_HOST, EMAIL_PORT, EMAIL_USER, and EMAIL_PASSWORD in .env file';
+    console.error('❌', errorMsg);
+    throw new Error(errorMsg);
+  }
+
   try {
     const transporter = createTransporter();
     
@@ -135,16 +160,25 @@ This is an automated email. Please do not reply to this message.
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log('Verification email sent:', info.messageId);
+    console.log('✅ Verification email sent successfully to:', user.email);
+    console.log('📧 Message ID:', info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('Error sending verification email:', error);
-    throw new Error('Failed to send verification email');
+    console.error('❌ Failed to send verification email:', error.message);
+    console.error('Error details:', error);
+    throw new Error(`Failed to send verification email: ${error.message}`);
   }
 };
 
 // Send welcome email after verification
 const sendWelcomeEmail = async (user) => {
+  // Check if email is configured - REQUIRED
+  if (!isEmailConfigured()) {
+    const errorMsg = 'Email configuration missing. Cannot send welcome email.';
+    console.error('❌', errorMsg);
+    throw new Error(errorMsg);
+  }
+
   try {
     const transporter = createTransporter();
     
@@ -200,15 +234,17 @@ const sendWelcomeEmail = async (user) => {
     };
 
     await transporter.sendMail(mailOptions);
-    console.log('Welcome email sent to:', user.email);
+    console.log('✅ Welcome email sent successfully to:', user.email);
+    return { success: true };
   } catch (error) {
-    console.error('Error sending welcome email:', error);
-    // Don't throw error for welcome email - it's not critical
+    console.error('❌ Failed to send welcome email:', error.message);
+    throw new Error(`Failed to send welcome email: ${error.message}`);
   }
 };
 
 module.exports = {
   generateVerificationToken,
   sendVerificationEmail,
-  sendWelcomeEmail
+  sendWelcomeEmail,
+  isEmailConfigured
 };

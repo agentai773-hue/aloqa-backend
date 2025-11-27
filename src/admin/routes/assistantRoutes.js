@@ -35,13 +35,6 @@ router.get('/:id', assistantController.getAssistantById);
 router.put('/:id', assistantController.updateAssistant);
 
 /**
- * @route   PUT /api/assistants/:id/full
- * @desc    Full update assistant (database + Bolna AI)
- * @access  Private (Admin only)
- */
-router.put('/:id/full', assistantController.updateAssistantFull);
-
-/**
  * @route   PATCH /api/assistants/:id
  * @desc    Patch update assistant (partial update to Bolna AI)
  * @access  Private (Admin only)
