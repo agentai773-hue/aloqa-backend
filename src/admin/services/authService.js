@@ -81,6 +81,35 @@ class AuthService {
     await adminRepository.removeRefreshToken(adminId);
     return { message: 'Logged out successfully' };
   }
+
+  async updateProfile(adminId, updateData) {
+    const { name, email } = updateData;
+
+    // Check if email is already in use by another admin
+    if (email) {
+      const existingAdmin = await adminRepository.findByEmail(email);
+      if (existingAdmin && existingAdmin._id.toString() !== adminId) {
+        throw { status: 400, message: 'Email is already in use by another admin' };
+      }
+    }
+
+    // Update admin profile
+    const updatedAdmin = await adminRepository.updateProfile(adminId, { name, email });
+    
+    if (!updatedAdmin) {
+      throw { status: 404, message: 'Admin not found' };
+    }
+
+    return {
+      admin: {
+        id: updatedAdmin._id,
+        name: updatedAdmin.name,
+        email: updatedAdmin.email,
+        role: updatedAdmin.role,
+        lastLogin: updatedAdmin.lastLogin
+      }
+    };
+  }
 }
 
 module.exports = new AuthService();

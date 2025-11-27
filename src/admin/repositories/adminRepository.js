@@ -37,6 +37,14 @@ class AdminRepository {
       { new: true }
     );
   }
+
+  async updateProfile(adminId, updateData) {
+    return await Admin.findByIdAndUpdate(
+      adminId,
+      updateData,
+      { new: true, runValidators: true }
+    ).select('-password -refreshToken');
+  }
 }
 
 module.exports = new AdminRepository();
