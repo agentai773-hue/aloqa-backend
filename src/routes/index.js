@@ -7,6 +7,10 @@ const verifyEmailRoutes = require('./verifyEmail');
 const clientAuthRoutes = require('../clients/routes/authRoutes');
 const leadRoutes = require('../clients/routes/leadRoutes');
 const clientAssistantRoutes = require('../clients/routes/assistantRoutes');
+const clientPhoneNumberRoutes = require('../clients/routes/phoneNumberRoutes');
+const assignAssistantPhoneRoutes = require('../clients/routes/assignAssistantPhoneRoutes');
+const callRoutes = require('../clients/routes/callRoutes');
+const callHistoryRoutes = require('../clients/routes/callHistoryRoutes');
 
 const router = express.Router();
 
@@ -48,6 +52,18 @@ router.use('/leads', leadRoutes);
 
 // Assistant management routes (client)
 router.use('/client-assistants', clientAssistantRoutes);
+
+// Phone number management routes (client)
+router.use('/client-phone-numbers', clientPhoneNumberRoutes);
+
+// Assign Assistant and Phone routes (client)
+router.use('/client-assign-assistant-phone', assignAssistantPhoneRoutes);
+
+// Call routes (client)
+router.use('/client-call', callRoutes);
+
+// Call history routes (client)
+router.use('/client-call', callHistoryRoutes);
 
 router.use('/client-auth', clientAuthRoutes);
 

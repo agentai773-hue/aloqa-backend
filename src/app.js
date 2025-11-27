@@ -14,6 +14,9 @@ require('./models/Lead');
 // Import routes
 const routes = require('./routes');
 
+// Import call status polling service
+const callStatusPollingService = require('./clients/services/callStatusPollingService');
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -77,11 +80,16 @@ app.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🌐 Access the server at: http://localhost:${PORT}`);
+  
+  // Start call status polling service
+  console.log('🔄 Initializing call status polling service...');
+  callStatusPollingService.startPolling();
 });
 
 // Graceful shutdown
 process.on('SIGINT', () => {
   console.log('\n🛑 Shutting down server gracefully...');
+  callStatusPollingService.stopPolling();
   process.exit(0);
 });
 

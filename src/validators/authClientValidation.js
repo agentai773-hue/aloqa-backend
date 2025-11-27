@@ -40,6 +40,14 @@ const refreshTokenValidation = [
     .withMessage('Refresh token is required')
 ];
 
+// Phone Number Retrieval Validation
+const phoneNumberRetrievalValidation = [
+  body('userId')
+    .optional()
+    .isMongoId()
+    .withMessage('Invalid user ID format')
+];
+
 // Validation error handler middleware
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
@@ -57,5 +65,6 @@ module.exports = {
   clientLoginValidation,
   clientRegisterValidation,
   refreshTokenValidation,
+  phoneNumberRetrievalValidation,
   handleValidationErrors
 };

@@ -1,5 +1,6 @@
 // clients/controllers/authController.js
 const jwt = require('../../utils/jwt');
+const User = require('../../models/User');
 const { loginUser } = require('../services/authService');
 
 async function login(req, res) {
@@ -52,7 +53,23 @@ async function verify(req, res) {
     }
 
     const decoded = jwt.verifyToken(token);
-    res.json({ token, user: decoded });
+    
+    // Fetch user from database to get bearerToken
+    const user = await User.findById(decoded.id).select(
+      'firstName lastName email mobile companyName role bearerToken isApproval'
+    );
+    
+    if (!user) {
+      return res.status(401).json({ message: 'User not found' });
+    }
+
+    // Create response object with bearerToken
+    const userResponse = {
+      ...decoded,
+      bearerToken: user.bearerToken
+    };
+
+    res.json({ token, user: userResponse });
   } catch (err) {
     res.status(401).json({ message: 'Invalid or expired token' });
   }
