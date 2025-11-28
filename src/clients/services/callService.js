@@ -12,18 +12,29 @@ class CallService {
   /**
    * Initiate a call to a lead
    */
-  async initiateCall(userId, leadId) {
+  async initiateCall(params) {
     try {
+      // Support both old signature (userId, leadId) and new signature ({userId, leadId, isAutoCall})
+      const userId = typeof params === 'string' ? params : params.userId;
+      const leadId = typeof params === 'string' ? arguments[1] : params.leadId;
+      const isAutoCall = typeof params === 'object' ? params.isAutoCall : false;
+      const autoCallAttemptNumber = typeof params === 'object' ? params.autoCallAttemptNumber : 0;
+
+      console.log('📞 Initiating call with params:', { userId, leadId, isAutoCall });
+
       // 1. Get lead details
       const lead = await this.repository.getLeadByIdAndUser(leadId, userId);
       
       if (!lead) {
+        console.error(`❌ Lead not found: leadId=${leadId}, userId=${userId}`);
         return {
           success: false,
           statusCode: 404,
           message: 'Lead not found'
         };
       }
+
+      console.log('✅ Lead found:', lead.full_name);
 
       // 2. Check if lead has a project assigned
       if (!lead.project_name) {
@@ -152,6 +163,8 @@ class CallService {
           status: bolnaResponse.status,
           bolnaResponse: bolnaResponse.initialResponse || {},
           executionDetails: bolnaResponse.executionDetails || null,
+          isAutoCall: isAutoCall,
+          autoCallAttemptNumber: autoCallAttemptNumber,
         };
 
         // If we have callDetails from execution, use them to fill in missing data

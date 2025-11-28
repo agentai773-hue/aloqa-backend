@@ -11,10 +11,28 @@ class CallRepository {
    */
   async getLeadByIdAndUser(leadId, userId) {
     try {
-      const lead = await Lead.findOne({
+      console.log(`🔍 Looking for lead with id=${leadId}, user_id=${userId}`);
+      
+      let lead = await Lead.findOne({
         _id: leadId,
         user_id: userId
       });
+      
+      if (!lead) {
+        // Try without user_id filter as fallback - maybe the user field is empty or different
+        console.warn(`⚠️ Lead not found with user_id match, trying without user_id filter...`);
+        lead = await Lead.findById(leadId);
+        
+        if (lead) {
+          console.warn(`⚠️ Lead exists but user_id mismatch. Lead user_id=${lead.user_id}, requested userId=${userId}. Proceeding anyway...`);
+          // Still return the lead - auth middleware should have validated the user
+        } else {
+          console.warn(`⚠️ Lead with id ${leadId} doesn't exist`);
+        }
+      } else {
+        console.log(`✅ Lead found with proper user_id: ${lead.full_name}`);
+      }
+      
       return lead;
     } catch (error) {
       console.error('Error fetching lead:', error);

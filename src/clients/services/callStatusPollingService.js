@@ -118,6 +118,8 @@ class CallStatusPollingService {
           recordingId: callDetails.recordingId || null,
           phoneNumberId: callDetails.phoneNumberId || call.phoneNumberId,
           recipientPhoneNumber: callDetails.recipientPhoneNumber || call.recipientPhoneNumber,
+          conversationTranscript: callDetails.conversationTranscript || null,
+          conversationMessages: callDetails.conversationMessages || [],
           executionDetails: executionData,
           lastStatusCheck: new Date(),
           lastStatusCheckResponse: {
@@ -135,6 +137,38 @@ class CallStatusPollingService {
 
         if (updated) {
           console.log(`✅ Updated call ${executionId} - Status: ${newStatus}, Recording: ${callDetails.recordingUrl ? '✓' : '✗'}`);
+          
+          // Update lead call status if call is completed
+          if (newStatus === 'completed' && call.leadId) {
+            try {
+              await callHistoryService.updateLeadCallStatus(call.leadId, 'completed');
+              console.log(`📞 Updated lead ${call.leadId} call status to completed`);
+              
+              // Extract and create site visit from transcript if available
+              if (callDetails.conversationTranscript) {
+                try {
+                  const siteVisitService = require('./siteVisitService');
+                  console.log('📍 Attempting to extract site visit from transcript (polling)...');
+                  
+                  const siteVisitResult = await siteVisitService.extractAndCreateSiteVisit(
+                    call.leadId.toString(),
+                    call._id.toString(),
+                    callDetails.conversationTranscript
+                  );
+
+                  if (siteVisitResult.success) {
+                    console.log('✅ Site visit created from transcript (polling):', siteVisitResult.data);
+                  } else {
+                    console.log('ℹ️ No site visit info in transcript:', siteVisitResult.message);
+                  }
+                } catch (siteVisitError) {
+                  console.warn('⚠️ Error extracting site visit from polling (non-blocking):', siteVisitError.message);
+                }
+              }
+            } catch (err) {
+              console.error(`Error updating lead ${call.leadId}:`, err.message);
+            }
+          }
         }
 
         // Log status progression for debugging

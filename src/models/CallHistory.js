@@ -98,6 +98,27 @@ const callHistorySchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: null,
     },
+    // Conversation transcript from Bolna
+    conversationTranscript: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+    conversationMessages: [
+      {
+        role: { type: String, enum: ['user', 'agent'] },
+        message: String,
+        timestamp: Date,
+      }
+    ],
+    // Auto-call tracking
+    isAutoCall: {
+      type: Boolean,
+      default: false,
+    },
+    autoCallAttemptNumber: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,

@@ -11,6 +11,8 @@ const clientPhoneNumberRoutes = require('../clients/routes/phoneNumberRoutes');
 const assignAssistantPhoneRoutes = require('../clients/routes/assignAssistantPhoneRoutes');
 const callRoutes = require('../clients/routes/callRoutes');
 const callHistoryRoutes = require('../clients/routes/callHistoryRoutes');
+const autoCallRoutes = require('../clients/routes/autoCallRoutes');
+const siteVisitRoutes = require('../clients/routes/siteVisitRoutes');
 
 const router = express.Router();
 
@@ -64,6 +66,12 @@ router.use('/client-call', callRoutes);
 
 // Call history routes (client)
 router.use('/client-call', callHistoryRoutes);
+
+// Auto-call routes (client)
+router.use('/client-call', autoCallRoutes);
+
+// Site visit routes (client)
+router.use('/client-site-visits', siteVisitRoutes);
 
 router.use('/client-auth', clientAuthRoutes);
 

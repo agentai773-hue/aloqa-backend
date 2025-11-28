@@ -1,4 +1,5 @@
 const callHistoryRepository = require('../repositories/callHistoryRepository');
+const siteVisitService = require('./siteVisitService');
 
 class CallHistoryService {
   // Save initial call record when call is initiated
@@ -20,6 +21,8 @@ class CallHistoryService {
         projectName: callData.projectName || null,
         bolnaResponse: callData.bolnaResponse || {},
         executionDetails: callData.executionDetails || null,
+        isAutoCall: callData.isAutoCall || false,
+        autoCallAttemptNumber: callData.autoCallAttemptNumber || 0,
       };
 
       console.log('Creating CallHistory record with data:', JSON.stringify(recordData, null, 2));
@@ -72,6 +75,8 @@ class CallHistoryService {
         recordingUrl: executionDetails.recordingUrl || null,
         recordingId: executionDetails.recordingId || null,
         callId: executionDetails.callId || existingCall.callId,
+        conversationTranscript: executionDetails.conversationTranscript || null,
+        conversationMessages: executionDetails.conversationMessages || [],
         executionDetails: executionDetails,
       };
 
@@ -111,11 +116,32 @@ class CallHistoryService {
         callDuration = webhookData.conversation_duration;
       }
 
+      // Extract conversation transcript
+      let conversationTranscript = null;
+      let conversationMessages = [];
+
+      if (webhookData.conversation) {
+        conversationTranscript = webhookData.conversation;
+      } else if (webhookData.conversation_data) {
+        conversationTranscript = webhookData.conversation_data;
+      }
+
+      // Parse messages if conversation is an array
+      if (Array.isArray(conversationTranscript)) {
+        conversationMessages = conversationTranscript.map((msg, idx) => ({
+          role: msg.role || msg.sender || (msg.type === 'agent_message' ? 'agent' : 'user'),
+          message: msg.message || msg.text || msg.content || '',
+          timestamp: msg.timestamp || new Date(Date.now() + idx * 1000),
+        }));
+      }
+
       const updateData = {
         status: webhookData.status || existingCall.status,
         callDuration: callDuration,
         recordingUrl: recordingUrl,
         recordingId: webhookData.recording_id || webhookData.recordingId || null,
+        conversationTranscript: conversationTranscript,
+        conversationMessages: conversationMessages,
         webhookData: webhookData,
       };
 
@@ -123,6 +149,48 @@ class CallHistoryService {
 
       const updatedCall = await callHistoryRepository.updateByCallId(callId, updateData);
       console.log(`Call ${callId} updated successfully`);
+
+      // Try to extract and create site visit from transcript if lead exists
+      if (existingCall.leadId) {
+        // Get transcript from multiple possible sources
+        let transcriptData = conversationTranscript;
+        
+        if (!transcriptData && webhookData.executionDetails?.transcript) {
+          transcriptData = webhookData.executionDetails.transcript;
+        }
+        
+        if (!transcriptData && webhookData.execution_details?.transcript) {
+          transcriptData = webhookData.execution_details.transcript;
+        }
+
+        if (!transcriptData && webhookData.transcript) {
+          transcriptData = webhookData.transcript;
+        }
+
+        if (transcriptData) {
+          try {
+            console.log('📍 Attempting to extract site visit from transcript...');
+            console.log('📄 Transcript to parse:', typeof transcriptData === 'string' ? transcriptData : JSON.stringify(transcriptData));
+            
+            const siteVisitResult = await siteVisitService.extractAndCreateSiteVisit(
+              existingCall.leadId.toString(),
+              existingCall._id.toString(),
+              transcriptData
+            );
+
+            if (siteVisitResult.success) {
+              console.log('✅ Site visit created from transcript:', siteVisitResult.data);
+            } else {
+              console.log('ℹ️ No site visit info in transcript:', siteVisitResult.message);
+            }
+          } catch (siteVisitError) {
+            console.warn('⚠️ Error extracting site visit (non-blocking):', siteVisitError.message);
+          }
+        } else {
+          console.log('⚠️ No transcript found in webhook data');
+        }
+      }
+
       return updatedCall;
     } catch (error) {
       console.error('Error updating call with webhook data:', error);
@@ -174,6 +242,22 @@ class CallHistoryService {
     } catch (error) {
       console.error('Error updating call status:', error);
       throw new Error(`Failed to update call status: ${error.message}`);
+    }
+  }
+
+  // Update lead call status when call completes
+  async updateLeadCallStatus(leadId, callStatus) {
+    try {
+      const Lead = require('../../models/Lead');
+      const updatedLead = await Lead.findByIdAndUpdate(
+        leadId,
+        { call_status: callStatus },
+        { new: true }
+      );
+      return updatedLead;
+    } catch (error) {
+      console.error('Error updating lead call status:', error);
+      throw new Error(`Failed to update lead call status: ${error.message}`);
     }
   }
 }

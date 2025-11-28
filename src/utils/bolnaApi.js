@@ -170,6 +170,44 @@ class BolnaApiService {
       }
       console.log(`Extracted phoneNumberId: ${phoneNumberId}`);
 
+      // Extract conversation transcript
+      let conversationTranscript = null;
+      let conversationMessages = [];
+
+      // Try to extract conversation from multiple possible locations
+      // IMPORTANT: Check for 'transcript' field first (new format from Bolna)
+      if (executionData.transcript) {
+        conversationTranscript = executionData.transcript;
+      } else if (executionData.conversation) {
+        conversationTranscript = executionData.conversation;
+      } else if (executionData.conversation_data) {
+        conversationTranscript = executionData.conversation_data;
+      } else if (executionData.call_data?.messages) {
+        conversationTranscript = executionData.call_data.messages;
+      } else if (executionData.messages) {
+        conversationTranscript = executionData.messages;
+      }
+
+      // Parse messages if conversation is an array or object with messages
+      if (Array.isArray(conversationTranscript)) {
+        conversationMessages = conversationTranscript.map((msg, idx) => ({
+          role: msg.role || msg.sender || (msg.type === 'agent_message' ? 'agent' : 'user'),
+          message: msg.message || msg.text || msg.content || '',
+          timestamp: msg.timestamp || new Date(Date.now() + idx * 1000),
+        }));
+      } else if (conversationTranscript && typeof conversationTranscript === 'object') {
+        // Handle object format
+        if (conversationTranscript.messages && Array.isArray(conversationTranscript.messages)) {
+          conversationMessages = conversationTranscript.messages.map((msg, idx) => ({
+            role: msg.role || msg.sender || (msg.type === 'agent_message' ? 'agent' : 'user'),
+            message: msg.message || msg.text || msg.content || '',
+            timestamp: msg.timestamp || new Date(Date.now() + idx * 1000),
+          }));
+        }
+      }
+
+      console.log(`Extracted conversation: ${conversationTranscript ? 'Found' : 'Not found'}, Messages: ${conversationMessages.length}`);
+
       const extracted = {
         callId: callId,
         executionId: executionData.execution_id || executionData.id || null,
@@ -181,6 +219,8 @@ class BolnaApiService {
         phoneNumberId: phoneNumberId,
         recipientPhoneNumber: recipientPhoneNumber,
         conversationDuration: executionData.conversation_duration || 0,
+        conversationTranscript: conversationTranscript,
+        conversationMessages: conversationMessages,
         telephonyData: executionData.telephony_data || null,
         contextDetails: executionData.context_details || null,
         fullData: executionData
