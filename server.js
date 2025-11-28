@@ -25,7 +25,7 @@ app.use(cors({
     const allowedOrigins = [
       'http://localhost:5173',        // Vite dev server (Admin Panel)
       'http://127.0.0.1:5173',        // Alternative localhost
-      'http://192.168.3.112:5173',    // Network IP
+      'http://192.168.2.37:5173',    // Network IP
       'http://localhost:3000',         // Next.js dev server (Client Portal)
       'http://127.0.0.1:3000',        // Alternative localhost
       'http://localhost:8080',         // Alternative frontend port

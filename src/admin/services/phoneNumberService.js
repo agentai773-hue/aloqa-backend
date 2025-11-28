@@ -293,7 +293,7 @@ class PhoneNumberService {
     // Check if phone number is already assigned
     const existingAssignment = await PhoneNumber.findOne({ phoneNumber, status: 'assigned' });
     if (existingAssignment) {
-      const error = new Error('Phone number is already assigned to another user');
+      const error = new Error('This phone number is already assigned to another user. Please select a different number.');
       error.status = 400;
       throw error;
     }

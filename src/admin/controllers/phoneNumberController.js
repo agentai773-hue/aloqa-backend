@@ -100,7 +100,7 @@ const assignPhoneNumber = async (req, res) => {
     if (existingAssignment) {
       return res.status(400).json({
         success: false,
-        message: 'This phone number is already assigned to another user'
+        message: 'This phone number is already assigned to another user. Please select a different number.'
       });
     }
 
