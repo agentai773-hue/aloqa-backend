@@ -26,11 +26,37 @@ const createUser = async (req, res) => {
 
   } catch (error) {
     console.error('Create user error:', error);
+    
+    // Handle MongoDB duplicate key error (E11000)
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyValue)[0];
+      const value = error.keyValue[field];
+      
+      return res.status(400).json({
+        success: false,
+        message: `${field.charAt(0).toUpperCase() + field.slice(1)} already exists`,
+        error: `The ${field} '${value}' is already registered in the system. Please use a different ${field}.`,
+        field: field,
+        value: value
+      });
+    }
+    
+    // Handle email configuration errors
+    if (error.message && error.message.includes('Email configuration missing')) {
+      return res.status(500).json({
+        success: false,
+        message: 'Email service not configured',
+        error: 'Email configuration is required to send verification emails. Please contact administrator.',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+    
+    // Handle other errors
     const status = error.status || 500;
     res.status(status).json({
       success: false,
       message: error.message || 'Server error creating user',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred while creating user'
     });
   }
 };
@@ -113,6 +139,22 @@ const updateUser = async (req, res) => {
 
   } catch (error) {
     console.error('Update user error:', error);
+    
+    // Handle MongoDB duplicate key error (E11000)
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyValue)[0];
+      const value = error.keyValue[field];
+      
+      return res.status(400).json({
+        success: false,
+        message: `${field.charAt(0).toUpperCase() + field.slice(1)} already exists`,
+        error: `The ${field} '${value}' is already in use by another user. Please use a different ${field}.`,
+        field: field,
+        value: value
+      });
+    }
+    
+    // Handle other errors
     const status = error.status || 500;
     res.status(status).json({
       success: false,

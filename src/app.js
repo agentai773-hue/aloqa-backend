@@ -21,22 +21,68 @@ const callStatusPollingService = require('./clients/services/callStatusPollingSe
 const autoCallService = require('./clients/services/autoCallService');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 8080;
+
+// Debug environment
+console.log('🚀 Starting server...');
+console.log('📍 NODE_ENV:', process.env.NODE_ENV || 'development');
+console.log('🔗 PORT:', PORT);
 
 // Connect to MongoDB
 connectDB();
 
-// Middleware
-app.use(helmet()); // Security headers
+// CORS configuration - MUST come before other middleware
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://192.168.3.103:3000'],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, Postman, or same-origin)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      'http://localhost:5173',        // Vite dev server (Admin Panel)
+      'http://127.0.0.1:5173',        // Alternative localhost
+      'http://localhost:3000',         // Next.js dev server (Client Portal)
+      'http://127.0.0.1:3000',        // Alternative localhost
+      'http://192.168.3.103:3000',    // Network IP
+      'http://192.168.2.37:5173',     // Network IP for Admin Panel
+      'https://aloqa-admin-panel-frontend.vercel.app', // Vercel deployment
+      'http://localhost:8080',
+      'http://localhost:8081'
+    ];
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('⚠️  CORS blocked origin:', origin);
+      callback(null, true); // Allow in development
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  optionsSuccessStatus: 200
-})); // Enable CORS with credentials
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  exposedHeaders: ['Set-Cookie'],
+  maxAge: 86400,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+}));
+
+// Handle preflight requests
+app.options('*', cors());
+
+// Middleware
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" }
+})); // Security headers with CORS-friendly config
+
 app.use(cookieParser()); // Parse cookies
-app.use(morgan('combined')); // Logging
+
+// Logging - only in development, minimal output
+if (process.env.NODE_ENV === 'development') {
+  app.use(morgan('dev')); // Colored, concise output
+} else {
+  app.use(morgan('combined')); // Detailed logs for production
+}
+
 app.use(express.json({ limit: '10mb' })); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 
@@ -79,7 +125,7 @@ app.use('*', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server is running on port ${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🌐 Access the server at: http://localhost:${PORT}`);

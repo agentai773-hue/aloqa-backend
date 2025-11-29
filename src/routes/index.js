@@ -32,7 +32,7 @@ router.use('/verify-email', verifyEmailRoutes);
 // admin routes 
 
 // Authentication routes
-router.use('/auth', authRoutes);
+router.use('/admin/auth', authRoutes);
 
 
 // User management routes

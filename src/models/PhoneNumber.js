@@ -95,7 +95,7 @@ const phoneNumberSchema = new mongoose.Schema({
 });
 
 // Index for quick lookups
-phoneNumberSchema.index({ phoneNumber: 1 });
+// phoneNumber already has unique index, no need for additional index
 phoneNumberSchema.index({ userId: 1 });
 phoneNumberSchema.index({ status: 1 });
 

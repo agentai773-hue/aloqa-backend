@@ -16,33 +16,52 @@ const PORT = process.env.PORT || 8080;
 // Connect to MongoDB
 connectDB();
 
-// Middleware
-app.use(helmet()); // Security headers
-
-// CORS configuration
+// CORS configuration - MUST come before other middleware
 app.use(cors({
-  origin: [
-    'http://localhost:5173', // Vite dev server
-    'http://192.168.3.112:5173',
-    'http://localhost:3000', // React dev server
-    'http://localhost:8080', // Alternative frontend port
-    'http://localhost:8081', // Alternative frontend port
-
-    process.env.CLIENT_URL,
-    process.env.CLIENT_URL1
-
-  ].filter(Boolean), // Remove undefined values
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, Postman, or same-origin)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      'http://localhost:5173',        // Vite dev server (Admin Panel)
+      'http://127.0.0.1:5173',        // Alternative localhost
+      'http://192.168.2.37:5173',    // Network IP
+      'http://localhost:3000',         // Next.js dev server (Client Portal)
+      'http://127.0.0.1:3000',        // Alternative localhost
+      'http://localhost:8080',         // Alternative frontend port
+      'http://localhost:8081',         // Alternative frontend port
+      process.env.CLIENT_URL,
+      process.env.CLIENT_URL1
+    ].filter(Boolean);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('⚠️  CORS blocked origin:', origin);
+      callback(null, true); // Allow in development - change to false in production
+    }
+  },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  exposedHeaders: ['Set-Cookie'],
+  maxAge: 86400, // 24 hours
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
+
+// Handle preflight requests
+app.options('*', cors());
+
+// Middleware
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" }
+})); // Security headers with CORS-friendly config
 
 app.use(morgan('combined')); // Logging
 app.use(express.json({ limit: '10mb' })); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
-
-// Handle preflight requests
-app.options('*', cors());
 
 // Routes
 app.get('/', (req, res) => {

@@ -86,6 +86,32 @@ const getProfile = async (req, res) => {
   }
 };
 
+// @desc    Verify token
+// @route   GET /api/auth/verify  
+// @access  Private
+const verifyToken = async (req, res) => {
+  try {
+    // Token is already verified by middleware, just return admin data
+    res.json({
+      success: true,
+      message: 'Token verified successfully',
+      data: {
+        valid: true,
+        admin: req.admin
+      }
+    });
+  } catch (error) {
+    console.error('Verify token error:', error);
+    res.status(401).json({
+      success: false,
+      message: 'Token verification failed',
+      data: {
+        valid: false
+      }
+    });
+  }
+};
+
 const logout = async (req, res) => {
   try {
     // Call service
@@ -104,9 +130,55 @@ const logout = async (req, res) => {
   }
 };
 
+// @desc    Update admin profile
+// @route   PUT /api/admin/auth/profile
+// @access  Private
+const updateProfile = async (req, res) => {
+  try {
+    const { name, email } = req.body;
+    const adminId = req.admin.id;
+
+    // Basic validation
+    if (!name || !email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name and email are required'
+      });
+    }
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid email address'
+      });
+    }
+
+    // Call service to update profile
+    const result = await authService.updateProfile(adminId, { name, email });
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: result
+    });
+
+  } catch (error) {
+    console.error('Update profile error:', error);
+    const status = error.status || 500;
+    res.status(status).json({
+      success: false,
+      message: error.message || 'Server error updating profile'
+    });
+  }
+};
+
 module.exports = {
   login,
   refreshToken,
   getProfile,
-  logout
+  verifyToken,
+  logout,
+  updateProfile
 };

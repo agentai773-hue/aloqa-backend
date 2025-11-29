@@ -31,14 +31,9 @@ class UserService {
     // Create user
     const user = await userRepository.create(userData);
 
-    // Send verification email (don't block user creation if email fails)
-    try {
-      await sendVerificationEmail(user, verificationToken);
-      console.log('Verification email sent to:', user.email);
-    } catch (emailError) {
-      console.error('Failed to send verification email:', emailError);
-      // Continue - user is created but email failed
-    }
+    // Send verification email - REQUIRED (will throw error if fails)
+    await sendVerificationEmail(user, verificationToken);
+    console.log('✅ User created and verification email sent to:', user.email);
 
     return user;
   }

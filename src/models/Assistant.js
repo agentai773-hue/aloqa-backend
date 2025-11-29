@@ -55,12 +55,7 @@ const assistantSchema = new mongoose.Schema({
   
   // LLM Configuration
   llmConfig: {
-    agentType: {
-      type: String,
-      default: 'simple_llm_agent',
-      enum: ['simple_llm_agent']
-    },
-    agentFlowType: {
+    agent_flow_type: {
       type: String,
       default: 'streaming',
       enum: ['streaming', 'non-streaming']
@@ -68,7 +63,7 @@ const assistantSchema = new mongoose.Schema({
     provider: {
       type: String,
       default: 'openai',
-      enum: ['openai', 'anthropic', 'groq', 'together']
+      enum: ['openai', 'openrouter', 'azure', 'deepseek', 'anthropic', 'groq', 'together']
     },
     family: {
       type: String,
@@ -76,48 +71,76 @@ const assistantSchema = new mongoose.Schema({
     },
     model: {
       type: String,
-      default: 'gpt-3.5-turbo',
-      enum: ['gpt-4o', 'gpt-4', 'gpt-3.5-turbo']
+      default: 'gpt-4o-mini',
+      enum: [
+        // OpenAI models
+        'gpt-4.1',
+        'gpt-4.1-nano', 
+        'gpt-4.1-mini',
+        'gpt-4o',
+        'gpt-4o-mini',
+        'gpt-4',
+        'gpt-4-turbo',
+        'gpt-3.5-turbo',
+        // Openrouter models
+        'gpt-oss-20b',
+        'gpt-oss-120b',
+        'Claude sonnet-4',
+        // Azure cluster models
+        'gpt-4.1-mini cluster',
+        'gpt-4.1 cluster',
+        'gpt-4.1-nano cluster',
+        'gpt-4o-mini cluster',
+        'gpt-4o cluster',
+        'gpt-4 cluster',
+        'gpt-3.5 cluster',
+        // Deepseek models
+        'deepseek-chat'
+      ]
     },
-    maxTokens: {
+    max_tokens: {
       type: Number,
-      default: 100,
+      default: 80,
       min: 0,
       max: 4000
     },
     temperature: {
       type: Number,
-      default: 0.4,
+      default: 0.2,
+      min: 0,
+      max: 2
+    },
+    top_p: {
+      type: Number,
+      default: 0.9,
       min: 0,
       max: 1
     },
-    topP: {
-      type: Number,
-      default: 0.9,
-      min: 0.1,
-      max: 1
-    },
-    minP: {
+    min_p: {
       type: Number,
       default: 0.1,
-      min: 0.1,
+      min: 0,
       max: 1
     },
-    topK: {
+    top_k: {
       type: Number,
       default: 0,
       min: 0,
       max: 50
     },
-    presencePenalty: {
+    presence_penalty: {
       type: Number,
-      default: 0
+      default: 0,
+      min: -2,
+      max: 2
     },
-    frequencyPenalty: {
+    frequency_penalty: {
       type: Number,
-      default: 0
+      default: 0,
+      min: -2,
+      max: 2
     },
-    requestJson: {
+    request_json: {
       type: Boolean,
       default: true
     }
@@ -130,7 +153,7 @@ const assistantSchema = new mongoose.Schema({
       default: 'polly',
       enum: ['polly', 'elevenlabs', 'elevenlab', 'deepgram', 'xtts']
     },
-    providerConfig: {
+    provider_config: {
       voice: {
         type: String,
         default: 'Kajal'
@@ -140,7 +163,7 @@ const assistantSchema = new mongoose.Schema({
         default: 'neural',
         enum: ['neural', 'generative', 'standard']
       },
-      samplingRate: {
+      sampling_rate: {
         type: String,
         default: '8000'
       },
@@ -157,11 +180,11 @@ const assistantSchema = new mongoose.Schema({
       type: Boolean,
       default: true
     },
-    bufferSize: {
+    buffer_size: {
       type: Number,
       default: 60
     },
-    audioFormat: {
+    audio_format: {
       type: String,
       default: 'wav',
       enum: ['wav', 'mp3']
@@ -187,7 +210,7 @@ const assistantSchema = new mongoose.Schema({
       type: Boolean,
       default: true
     },
-    samplingRate: {
+    sampling_rate: {
       type: Number,
       default: 16000,
       min: 1000,
@@ -233,26 +256,26 @@ const assistantSchema = new mongoose.Schema({
   
   // Task Configuration
   taskConfig: {
-    hangupAfterSilence: {
+    hangup_after_silence: {
       type: Number,
       default: 6,
       min: 0,
       max: 10,
       comment: 'Seconds of silence before hanging up'
     },
-    callTerminate: {
+    call_terminate: {
       type: Number,
-      default: 90,
+      default: 800,
       comment: 'Maximum call duration in seconds'
     },
-    incrementalDelay: {
+    incremental_delay: {
       type: Number,
-      default: 400,
+      default: 40,
       min: 10,
       max: 2000,
       comment: 'Incremental delay in milliseconds'
     },
-    numberOfWordsForInterruption: {
+    number_of_words_for_interruption: {
       type: Number,
       default: 2,
       min: 1,
@@ -263,27 +286,27 @@ const assistantSchema = new mongoose.Schema({
       type: Boolean,
       default: false
     },
-    ambientNoise: {
+    ambient_noise: {
       type: Boolean,
       default: false
     },
-    hangupAfterLLMCall: {
+    hangup_after_llm_call: {
       type: Boolean,
       default: false
     },
-    callCancellationPrompt: {
+    call_cancellation_prompt: {
       type: String,
       default: null
     },
-    backchannelingMessageGap: {
+    backchanneling_message_gap: {
       type: Number,
       default: 5
     },
-    backchannelingStartDelay: {
+    backchanneling_start_delay: {
       type: Number,
       default: 5
     },
-    ambientNoiseTrack: {
+    ambient_noise_track: {
       type: String,
       default: 'office-ambience'
     },
@@ -291,14 +314,14 @@ const assistantSchema = new mongoose.Schema({
       type: Boolean,
       default: false
     },
-    inboundLimit: {
+    inbound_limit: {
       type: Number,
       default: -1
     },
-    whitelistPhoneNumbers: [{
+    whitelist_phone_numbers: [{
       type: String
     }],
-    disallowUnknownNumbers: {
+    disallow_unknown_numbers: {
       type: Boolean,
       default: false
     }
