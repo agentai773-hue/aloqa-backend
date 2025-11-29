@@ -33,6 +33,7 @@ app.use(cors({
       'http://127.0.0.1:3000',        // Alternative localhost
       'http://192.168.3.103:3000',    // Network IP
       'http://192.168.2.37:5173',     // Network IP for Admin Panel
+      'https://aloqa-admin-panel-frontend.vercel.app', // Vercel deployment
       'http://localhost:8080',
       'http://localhost:8081'
     ];
