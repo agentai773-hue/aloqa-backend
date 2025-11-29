@@ -3,21 +3,12 @@ const crypto = require('crypto');
 
 // Check if email is configured
 const isEmailConfigured = () => {
-  const configured = !!(
+  return !!(
     process.env.EMAIL_HOST &&
     process.env.EMAIL_PORT &&
     process.env.EMAIL_USER &&
     process.env.EMAIL_PASSWORD
   );
-  
-  console.log('📧 Email Configuration Check:');
-  console.log('  EMAIL_HOST:', !!process.env.EMAIL_HOST);
-  console.log('  EMAIL_PORT:', !!process.env.EMAIL_PORT);
-  console.log('  EMAIL_USER:', !!process.env.EMAIL_USER);
-  console.log('  EMAIL_PASSWORD:', !!process.env.EMAIL_PASSWORD);
-  console.log('  Configured:', configured);
-  
-  return configured;
 };
 
 // Configure email transporter
@@ -27,7 +18,7 @@ const createTransporter = () => {
     return null;
   }
 
-  return nodemailer.createTransporter({
+  return nodemailer.createTransport({
     host: process.env.EMAIL_HOST,
     port: parseInt(process.env.EMAIL_PORT),
     secure: process.env.EMAIL_PORT === '465', // true for 465, false for other ports
@@ -36,13 +27,8 @@ const createTransporter = () => {
       pass: process.env.EMAIL_PASSWORD
     },
     tls: {
-      rejectUnauthorized: false // Allow self-signed certificates
-    },
-    connectionTimeout: 5000, // 5 seconds (reduced from 10)
-    greetingTimeout: 3000, // 3 seconds (reduced from 5)  
-    socketTimeout: 5000, // 5 seconds (reduced from 10)
-    debug: process.env.NODE_ENV === 'development',
-    logger: process.env.NODE_ENV === 'development'
+      rejectUnauthorized: false // Allow self-signed certificates in development
+    }
   });
 };
 
@@ -53,27 +39,14 @@ const generateVerificationToken = () => {
 
 // Send verification email
 const sendVerificationEmail = async (user, verificationToken) => {
-  // Check if email is disabled
-  if (process.env.DISABLE_EMAIL === 'true') {
-    console.log('📧 Email disabled via DISABLE_EMAIL environment variable');
-    return { success: false, disabled: true };
-  }
-
-  // Check if email is configured - In production, log warning but don't throw
+  // Check if email is configured - REQUIRED
   if (!isEmailConfigured()) {
     const errorMsg = 'Email configuration missing. Please set EMAIL_HOST, EMAIL_PORT, EMAIL_USER, and EMAIL_PASSWORD in .env file';
     console.error('❌', errorMsg);
-    
-    // In production, don't break user creation due to email issues
-    if (process.env.NODE_ENV === 'production') {
-      console.warn('⚠️  Skipping email in production due to configuration issues');
-      return null;
-    }
     throw new Error(errorMsg);
   }
 
   try {
-    console.log('📧 Attempting to send verification email to:', user.email);
     const transporter = createTransporter();
     
     // Frontend URL (update this to your actual client URL)
@@ -193,13 +166,6 @@ This is an automated email. Please do not reply to this message.
   } catch (error) {
     console.error('❌ Failed to send verification email:', error.message);
     console.error('Error details:', error);
-    
-    // In production, don't break the application due to email issues
-    if (process.env.NODE_ENV === 'production') {
-      console.warn('⚠️  Email sending failed in production - continuing without email');
-      return { success: false, error: error.message };
-    }
-    
     throw new Error(`Failed to send verification email: ${error.message}`);
   }
 };

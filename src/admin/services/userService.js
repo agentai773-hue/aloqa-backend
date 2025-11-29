@@ -31,18 +31,10 @@ class UserService {
     // Create user
     const user = await userRepository.create(userData);
 
-    // Send verification email in background - Don't wait for it
-    setImmediate(async () => {
-      try {
-        await sendVerificationEmail(user, verificationToken);
-        console.log('✅ User created and verification email sent to:', user.email);
-      } catch (emailError) {
-        console.warn('⚠️  Background email sending failed:', emailError.message);
-        console.warn('📧 Manual verification may be required for user:', user.email);
-      }
-    });
+    // Send verification email - REQUIRED (will throw error if fails)
+    await sendVerificationEmail(user, verificationToken);
+    console.log('✅ User created and verification email sent to:', user.email);
 
-    console.log('✅ User created successfully:', user.email);
     return user;
   }
 
