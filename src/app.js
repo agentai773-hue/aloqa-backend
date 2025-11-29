@@ -14,6 +14,12 @@ require('./models/Lead');
 // Import routes
 const routes = require('./routes');
 
+// Import call status polling service
+const callStatusPollingService = require('./clients/services/callStatusPollingService');
+
+// Import auto-call service
+const autoCallService = require('./clients/services/autoCallService');
+
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -123,12 +129,22 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server is running on port ${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🌐 Access the server at: http://localhost:${PORT}`);
-  console.log(`🌐 Network access at: http://192.168.2.37:${PORT}`);
+  
+  // Start auto-call service on server startup
+  setTimeout(() => {
+    console.log('🔄 Starting auto-call service...');
+    autoCallService.startAutoCall();
+  }, 2000); // Wait 2 seconds for DB to be ready
+  
+  // Start call status polling service
+  console.log('🔄 Initializing call status polling service...');
+  callStatusPollingService.startPolling();
 });
 
 // Graceful shutdown
 process.on('SIGINT', () => {
   console.log('\n🛑 Shutting down server gracefully...');
+  callStatusPollingService.stopPolling();
   process.exit(0);
 });
 
