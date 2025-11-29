@@ -17,6 +17,11 @@ const routes = require('./routes');
 const app = express();
 const PORT = process.env.PORT || 8080;
 
+// Debug environment
+console.log('🚀 Starting server...');
+console.log('📍 NODE_ENV:', process.env.NODE_ENV || 'development');
+console.log('🔗 PORT:', PORT);
+
 // Connect to MongoDB
 connectDB();
 
