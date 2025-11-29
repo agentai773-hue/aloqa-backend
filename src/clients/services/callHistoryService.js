@@ -150,6 +150,16 @@ class CallHistoryService {
       const updatedCall = await callHistoryRepository.updateByCallId(callId, updateData);
       console.log(`Call ${callId} updated successfully`);
 
+      // Update lead's lead_type to "hot" if call status is "completed"
+      if (existingCall.leadId && updateData.status === 'completed') {
+        try {
+          await this.updateLeadType(existingCall.leadId, 'hot');
+          console.log(`Lead ${existingCall.leadId} lead_type updated to "hot"`);
+        } catch (error) {
+          console.warn(`⚠️ Error updating lead type (non-blocking):`, error.message);
+        }
+      }
+
       // Try to extract and create site visit from transcript if lead exists
       if (existingCall.leadId) {
         // Get transcript from multiple possible sources
@@ -258,6 +268,22 @@ class CallHistoryService {
     } catch (error) {
       console.error('Error updating lead call status:', error);
       throw new Error(`Failed to update lead call status: ${error.message}`);
+    }
+  }
+
+  // Update lead type when call status changes to completed
+  async updateLeadType(leadId, leadType) {
+    try {
+      const Lead = require('../../models/Lead');
+      const updatedLead = await Lead.findByIdAndUpdate(
+        leadId,
+        { lead_type: leadType },
+        { new: true }
+      );
+      return updatedLead;
+    } catch (error) {
+      console.error('Error updating lead type:', error);
+      throw new Error(`Failed to update lead type: ${error.message}`);
     }
   }
 }

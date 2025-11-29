@@ -20,6 +20,11 @@ const SiteVisitSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    siteExecutiveId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'SiteUser',
+      index: true,
+    },
     address: {
       type: String,
     },

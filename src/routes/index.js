@@ -13,6 +13,7 @@ const callRoutes = require('../clients/routes/callRoutes');
 const callHistoryRoutes = require('../clients/routes/callHistoryRoutes');
 const autoCallRoutes = require('../clients/routes/autoCallRoutes');
 const siteVisitRoutes = require('../clients/routes/siteVisitRoutes');
+const siteUserRoutes = require('../clients/routes/siteUserRoutes');
 
 const router = express.Router();
 
@@ -72,6 +73,9 @@ router.use('/client-call', autoCallRoutes);
 
 // Site visit routes (client)
 router.use('/client-site-visits', siteVisitRoutes);
+
+// Site user routes (client)
+router.use('/client-site-users', siteUserRoutes);
 
 router.use('/client-auth', clientAuthRoutes);
 

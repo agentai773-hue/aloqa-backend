@@ -7,23 +7,28 @@ class SiteVisitRepository {
   }
 
   async findById(id) {
-    return await SiteVisit.findById(id).populate('leadId');
+    return await SiteVisit.findById(id)
+      .populate('leadId')
+      .populate('siteExecutiveId', 'full_name contact_number project_name');
   }
 
   async findByLeadId(leadId) {
     return await SiteVisit.find({ leadId })
       .populate('leadId')
+      .populate('siteExecutiveId', 'full_name contact_number project_name')
       .sort({ visitDate: -1 });
   }
 
   async findAll(filters = {}) {
     return await SiteVisit.find(filters)
       .populate('leadId')
+      .populate('siteExecutiveId', 'full_name contact_number project_name')
       .sort({ visitDate: -1 });
   }
 
   async updateById(id, updateData) {
-    return await SiteVisit.findByIdAndUpdate(id, updateData, { new: true });
+    return await SiteVisit.findByIdAndUpdate(id, updateData, { new: true })
+      .populate('siteExecutiveId', 'full_name contact_number project_name');
   }
 
   async deleteById(id) {
@@ -31,7 +36,7 @@ class SiteVisitRepository {
   }
 
   async findByCallHistoryId(callHistoryId) {
-    return await SiteVisit.findOne({ callHistoryId });
+    return await SiteVisit.findOne({ callHistoryId }).populate('siteExecutiveId', 'full_name contact_number project_name');
   }
 
   async findUpcoming(leadId) {
@@ -39,14 +44,18 @@ class SiteVisitRepository {
       leadId,
       visitDate: { $gte: new Date() },
       status: { $in: ['scheduled', 'rescheduled'] },
-    }).sort({ visitDate: 1 });
+    })
+      .populate('siteExecutiveId', 'full_name contact_number project_name')
+      .sort({ visitDate: 1 });
   }
 
   async findCompleted(leadId) {
     return await SiteVisit.find({
       leadId,
       status: 'completed',
-    }).sort({ visitDate: -1 });
+    })
+      .populate('siteExecutiveId', 'full_name contact_number project_name')
+      .sort({ visitDate: -1 });
   }
 }
 
