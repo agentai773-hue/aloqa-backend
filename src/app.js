@@ -15,7 +15,7 @@ require('./models/Lead');
 const routes = require('./routes');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 8080;
 
 // Connect to MongoDB
 connectDB();
@@ -32,6 +32,7 @@ app.use(cors({
       'http://localhost:3000',         // Next.js dev server (Client Portal)
       'http://127.0.0.1:3000',        // Alternative localhost
       'http://192.168.3.103:3000',    // Network IP
+      'http://192.168.2.37:5173',     // Network IP for Admin Panel
       'http://localhost:8080',
       'http://localhost:8081'
     ];
@@ -112,10 +113,11 @@ app.use('*', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server is running on port ${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🌐 Access the server at: http://localhost:${PORT}`);
+  console.log(`🌐 Network access at: http://192.168.2.37:${PORT}`);
 });
 
 // Graceful shutdown
