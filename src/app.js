@@ -45,26 +45,25 @@ app.use(cors({
       'http://192.168.3.103:3000',    // Network IP
       'http://192.168.2.37:5173',     // Network IP for Admin Panel
       'https://aloqa-admin-panel-frontend.vercel.app', // Vercel deployment
+      'https://aloqa-client-side-frontend.vercel.app', // Vercel deployment
       'http://localhost:8080',
       'http://localhost:8081',
-      'https://aloqa-client-side-frontend.vercel.app',
-
     ];
     
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      console.log('⚠️  CORS blocked origin:', origin);
+      console.log('⚠️  CORS origin:', origin, '- allowing for now');
       callback(null, true); // Allow in development
     }
   },
-  credentials: true,
+  credentials: true, // CRITICAL: allow credentials (cookies)
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-  exposedHeaders: ['Set-Cookie'],
+  exposedHeaders: ['Set-Cookie'], // CRITICAL: expose Set-Cookie header
   maxAge: 86400,
   preflightContinue: false,
-  optionsSuccessStatus: 204
+  optionsSuccessStatus: 200 // Some browsers need 200 for preflight
 }));
 
 // Handle preflight requests

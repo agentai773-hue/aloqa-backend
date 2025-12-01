@@ -10,16 +10,18 @@ async function login(req, res) {
     const { email, password } = req.body;
     const { token, user } = await loginUser(email, password);
     
-    // Set cookie with proper security settings
+    // Set cookie with environment-specific settings
+    const isProduction = process.env.NODE_ENV === 'production';
     const cookieOptions = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' ? true : false,
-      sameSite: 'lax', // Use 'lax' for better cross-site cookie handling
+      secure: isProduction, // HTTPS only in production
+      sameSite: isProduction ? 'none' : 'lax', // Use 'none' for HTTPS cross-origin
       maxAge: 10 * 24 * 60 * 60 * 1000, // 10 days
-      path: '/', // Ensure cookie is available across all paths
+      path: '/', // Available across all paths
     };
     
     console.log('✅ Login successful for user:', email);
+    console.log('🍪 Cookie settings:', { secure: cookieOptions.secure, sameSite: cookieOptions.sameSite });
     res.cookie('token', token, cookieOptions);
     
     res.status(200).json({ 
@@ -41,11 +43,12 @@ async function login(req, res) {
 
 async function logout(req, res) {
   try {
+    const isProduction = process.env.NODE_ENV === 'production';
     // Clear the token cookie
     res.clearCookie('token', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' ? true : false,
-      sameSite: 'lax',
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
       path: '/',
     });
     
