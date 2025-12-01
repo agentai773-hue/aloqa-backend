@@ -5,6 +5,7 @@ const clientAuthMiddleware = require('../../middleware/clientMiddleware');
 
 // Protected routes - require authentication
 router.get('/call-history', clientAuthMiddleware, callHistoryController.getCallHistory);
+router.post('/call-history/search', clientAuthMiddleware, callHistoryController.searchCallHistory);
 router.get('/call-history/lead/:leadId', clientAuthMiddleware, callHistoryController.getCallHistoryByLead);
 router.get('/call-history/recordings', clientAuthMiddleware, callHistoryController.getCallsWithRecordings);
 router.get('/call-history/details/:callId', clientAuthMiddleware, callHistoryController.getCallDetails);

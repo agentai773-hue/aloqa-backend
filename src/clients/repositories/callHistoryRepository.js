@@ -68,9 +68,29 @@ class CallHistoryRepository {
   }
 
   // Get recent calls for a user with pagination
-  async getRecentCalls(userId, page = 1, pageSize = 10) {
+  async getRecentCalls(userId, page = 1, pageSize = 10, filters = {}) {
     const skip = (page - 1) * pageSize;
-    const calls = await CallHistory.find({ userId })
+    
+    // Start with base query
+    let query = { userId };
+
+    // Add status filter if provided
+    if (filters.status && filters.status !== 'all') {
+      query.status = filters.status;
+    }
+
+    // Add assistant filter if provided
+    if (filters.assistantId && filters.assistantId !== 'all') {
+      const mongoose = require('mongoose');
+      try {
+        query.assistantId = new mongoose.Types.ObjectId(filters.assistantId);
+      } catch (error) {
+        console.error('Invalid assistant ID format:', filters.assistantId);
+        // If invalid ID, just skip this filter
+      }
+    }
+
+    const calls = await CallHistory.find(query)
       .sort({ createdAt: -1 })
       .limit(pageSize)
       .skip(skip)
@@ -78,8 +98,8 @@ class CallHistoryRepository {
       .populate('phoneNumberId')
       .populate('assistantId');
     
-    const total = await CallHistory.countDocuments({ userId });
-    
+    const total = await CallHistory.countDocuments(query);
+
     return {
       calls,
       pagination: {
@@ -107,6 +127,64 @@ class CallHistoryRepository {
     })
       .sort({ createdAt: -1 })
       .populate('leadId');
+  }
+
+  // Search calls by callerName, recipientPhoneNumber, or projectName with optional filters
+  async searchCalls(userId, searchTerm, page = 1, pageSize = 10, filters = {}) {
+    const skip = (page - 1) * pageSize;
+    
+    // Start with base query
+    let query = { userId };
+
+    // Add search term filter if provided (search across three fields)
+    if (searchTerm && searchTerm.trim()) {
+      const searchRegex = new RegExp(searchTerm, 'i');
+      query.$or = [
+        { callerName: searchRegex },
+        { recipientPhoneNumber: searchRegex },
+        { projectName: searchRegex }
+      ];
+    }
+
+    // Add status filter if provided
+    if (filters.status && filters.status !== 'all') {
+      query.status = filters.status;
+    }
+
+    // Add assistant filter if provided
+    if (filters.assistantId && filters.assistantId !== 'all') {
+      const mongoose = require('mongoose');
+      try {
+        query.assistantId = new mongoose.Types.ObjectId(filters.assistantId);
+      } catch (error) {
+        console.error('Invalid assistant ID format:', filters.assistantId);
+        // If invalid ID, just skip this filter
+      }
+    }
+
+    console.log('Executing search with query:', JSON.stringify(query, null, 2));
+    
+    const calls = await CallHistory.find(query)
+      .sort({ createdAt: -1 })
+      .limit(pageSize)
+      .skip(skip)
+      .populate('leadId')
+      .populate('phoneNumberId')
+      .populate('assistantId');
+    
+    const total = await CallHistory.countDocuments(query);
+
+    console.log(`Found ${calls.length} results out of ${total} matching records`);
+    
+    return {
+      calls,
+      pagination: {
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize),
+      },
+    };
   }
 }
 

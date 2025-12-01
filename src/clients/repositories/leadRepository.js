@@ -106,6 +106,98 @@ class LeadRepository {
       throw new Error(`Error bulk creating leads: ${error.message}`);
     }
   }
+
+  // Search leads with filters: searchTerm, lead_type, call_status, date_range
+  async searchLeads(userId, searchTerm = '', page = 1, pageSize = 10, filters = {}) {
+    try {
+      const skip = (page - 1) * pageSize;
+
+      // Start with base query - only non-deleted leads
+      let query = { 
+        user_id: userId,
+        deleted_at: null 
+      };
+
+      // Add search term filter if provided (search across name, contact_number, project_name)
+      if (searchTerm && searchTerm.trim()) {
+        const searchRegex = new RegExp(searchTerm, 'i');
+        query.$or = [
+          { full_name: searchRegex },
+          { contact_number: searchRegex },
+          { project_name: searchRegex }
+        ];
+      }
+
+      // Add lead_type filter if provided
+      if (filters.leadType && filters.leadType !== 'all') {
+        query.lead_type = filters.leadType;
+      }
+
+      // Add call_status filter if provided
+      if (filters.callStatus && filters.callStatus !== 'all') {
+        query.call_status = filters.callStatus;
+      }
+
+      // Add date_range filter if provided
+      if (filters.dateRange && filters.dateRange !== 'all') {
+        const now = new Date();
+        let startDate;
+
+        switch (filters.dateRange) {
+          case 'today':
+            startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            break;
+          case 'yesterday':
+            const yesterday = new Date(now);
+            yesterday.setDate(yesterday.getDate() - 1);
+            startDate = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
+            const endYesterday = new Date(startDate);
+            endYesterday.setDate(endYesterday.getDate() + 1);
+            query.created_at = { $gte: startDate, $lt: endYesterday };
+            break;
+          case 'last_week':
+            startDate = new Date(now);
+            startDate.setDate(startDate.getDate() - 7);
+            break;
+          case 'last_month':
+            startDate = new Date(now);
+            startDate.setDate(startDate.getDate() - 30);
+            break;
+          default:
+            break;
+        }
+
+        // Only add date filter if not yesterday (which has special logic)
+        if (filters.dateRange !== 'yesterday' && startDate) {
+          query.created_at = { $gte: startDate };
+        }
+      }
+
+      console.log('Search leads query:', JSON.stringify(query, null, 2));
+
+      // Execute query
+      const leads = await Lead.find(query)
+        .sort({ created_at: -1 })
+        .limit(pageSize)
+        .skip(skip);
+
+      const total = await Lead.countDocuments(query);
+
+      console.log(`Found ${leads.length} leads out of ${total} total matching records`);
+
+      return {
+        leads,
+        pagination: {
+          total,
+          page,
+          pageSize,
+          totalPages: Math.ceil(total / pageSize),
+        },
+      };
+    } catch (error) {
+      throw new Error(`Error searching leads: ${error.message}`);
+    }
+  }
 }
 
 module.exports = LeadRepository;
