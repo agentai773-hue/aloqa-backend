@@ -1,16 +1,76 @@
 /**
- * Bolna API Utilities
- * Handles all interactions with Bolna API
+ * Bolna API Service
+ * Handles all interactions with Bolna API with proper error handling
+ * Located in clients/utils for client-side API integration
  */
 
 const axios = require('axios');
 
 const BOLNA_API_URL = process.env.BOLNA_API_URL || 'https://api.bolna.ai';
+const REQUEST_TIMEOUT = parseInt(process.env.BOLNA_REQUEST_TIMEOUT || '10000', 10);
 
 class BolnaApiService {
+  constructor() {
+    this.client = axios.create({
+      baseURL: BOLNA_API_URL,
+      timeout: REQUEST_TIMEOUT,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+  }
+
+  /**
+   * Handle axios errors with proper categorization
+   * @param {Error} error - The error object from axios
+   * @param {string} operationName - Name of the operation that failed
+   * @returns {Object} - Formatted error response
+   */
+  handleAxiosError(error, operationName) {
+    const errorResponse = {
+      success: false,
+      operationName: operationName
+    };
+
+    if (error.response) {
+      // Server responded with error status
+      errorResponse.statusCode = error.response.status;
+      errorResponse.error = error.response.data?.message || error.response.statusText || 'Server error';
+      errorResponse.details = error.response.data;
+      
+      console.error(`❌ [${operationName}] Server error (${error.response.status}):`, error.response.data);
+    } else if (error.code === 'ECONNABORTED') {
+      // Request timeout
+      errorResponse.error = `Request timeout after ${REQUEST_TIMEOUT}ms`;
+      errorResponse.code = 'TIMEOUT';
+      
+      console.error(`❌ [${operationName}] Timeout:`, errorResponse.error);
+    } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+      // Network error - cannot reach server
+      errorResponse.error = 'Network error: Unable to reach Bolna API';
+      errorResponse.code = error.code;
+      
+      console.error(`❌ [${operationName}] Network error:`, error.message);
+    } else if (error.request && !error.response) {
+      // Request made but no response
+      errorResponse.error = 'No response from Bolna API';
+      errorResponse.code = 'NO_RESPONSE';
+      
+      console.error(`❌ [${operationName}] No response from server`);
+    } else {
+      // Client-side error
+      errorResponse.error = error.message || 'Unknown error occurred';
+      errorResponse.code = 'CLIENT_ERROR';
+      
+      console.error(`❌ [${operationName}] Client error:`, error.message);
+    }
+
+    return errorResponse;
+  }
+
   /**
    * Fetch execution details from Bolna
-   * https://api.bolna.ai/executions/{execution_id}
+   * GET https://api.bolna.ai/executions/{execution_id}
    */
   async fetchExecutionDetails(executionId, bearerToken) {
     try {
@@ -21,20 +81,18 @@ class BolnaApiService {
         };
       }
 
-      const response = await axios.get(
-        `${BOLNA_API_URL}/executions/${executionId}`,
+      const response = await this.client.get(
+        `/executions/${executionId}`,
         {
           headers: {
-            'Authorization': `Bearer ${bearerToken}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: 10000
+            'Authorization': `Bearer ${bearerToken}`
+          }
         }
       );
 
-      console.log(`Bolna Execution Details (${executionId}):`, JSON.stringify(response.data, null, 2));
-
       if (response.status === 200) {
+        console.log(`✅ [fetchExecutionDetails] Success for execution ${executionId}`);
+        
         return {
           success: true,
           data: response.data,
@@ -45,20 +103,17 @@ class BolnaApiService {
       return {
         success: false,
         error: 'Unexpected response from Bolna executions API',
+        statusCode: response.status,
         details: response.data
       };
     } catch (error) {
-      console.error(`Error fetching execution details for ${executionId}:`, error.response?.data || error.message);
-      return {
-        success: false,
-        error: error.response?.data?.message || error.message || 'Failed to fetch execution details',
-        executionId: executionId
-      };
+      return this.handleAxiosError(error, 'fetchExecutionDetails');
     }
   }
 
   /**
    * Make initial call to Bolna API
+   * POST https://api.bolna.ai/call
    * This returns execution_id (not call_id)
    */
   async makeCallToBolna(payload, bearerToken) {
@@ -70,24 +125,29 @@ class BolnaApiService {
         };
       }
 
-      const response = await axios.post(
-        `${BOLNA_API_URL}/call`,
+      if (!payload) {
+        return {
+          success: false,
+          error: 'Payload is required for call initialization'
+        };
+      }
+
+      const response = await this.client.post(
+        '/call',
         payload,
         {
           headers: {
-            'Authorization': `Bearer ${bearerToken}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: 10000
+            'Authorization': `Bearer ${bearerToken}`
+          }
         }
       );
-
-      console.log('Bolna Call Initiation Response:', JSON.stringify(response.data, null, 2));
 
       if (response.status === 200 || response.status === 201) {
         // Bolna returns execution_id, run_id in the initial response
         const executionId = response.data.execution_id || response.data.run_id;
         const status = response.data.status || 'queued';
+        
+        console.log(`✅ [makeCallToBolna] Call initiated successfully. Execution ID: ${executionId}`);
         
         return {
           success: true,
@@ -102,32 +162,30 @@ class BolnaApiService {
       return {
         success: false,
         error: 'Unexpected response from Bolna API',
+        statusCode: response.status,
         details: response.data
       };
     } catch (error) {
-      console.error('Bolna API call error:', error.response?.data || error.message);
-      return {
-        success: false,
-        error: error.response?.data?.message || error.message || 'Failed to connect to Bolna API',
-        statusCode: error.response?.status
-      };
+      return this.handleAxiosError(error, 'makeCallToBolna');
     }
   }
 
   /**
    * Extract call details from execution response
    * Handles different formats from Bolna
+   * @param {Object} executionData - The execution data from Bolna
+   * @returns {Object|null} - Extracted call details or null
    */
   extractCallDetailsFromExecution(executionData) {
     try {
       if (!executionData) {
-        console.warn('No execution data provided for extraction');
+        console.warn('⚠️ No execution data provided for extraction');
         return null;
       }
 
       // Extract call ID (try multiple formats)
       const callId = executionData.call_id || executionData.callId || executionData.id || null;
-      console.log(`Extracted callId: ${callId} (from execution_id: ${executionData.id})`);
+      console.log(`📋 Extracted callId: ${callId} (from execution_id: ${executionData.id})`);
 
       // Extract recording URL from telephony_data (Bolna's actual structure)
       let recordingUrl = null;
@@ -136,7 +194,7 @@ class BolnaApiService {
       } else if (executionData.recording_url) {
         recordingUrl = executionData.recording_url;
       }
-      console.log(`Extracted recordingUrl: ${recordingUrl}`);
+      console.log(`🎙️ Extracted recordingUrl: ${recordingUrl ? 'Found' : 'Not found'}`);
 
       // Extract duration from telephony_data or direct
       let duration = null;
@@ -147,7 +205,7 @@ class BolnaApiService {
       } else if (executionData.conversation_duration) {
         duration = executionData.conversation_duration;
       }
-      console.log(`Extracted duration: ${duration}`);
+      console.log(`⏱️ Extracted duration: ${duration}s`);
 
       // Extract phone numbers from context or direct
       let recipientPhoneNumber = null;
@@ -158,7 +216,7 @@ class BolnaApiService {
       } else if (executionData.telephony_data?.to_number) {
         recipientPhoneNumber = executionData.telephony_data.to_number;
       }
-      console.log(`Extracted recipientPhoneNumber: ${recipientPhoneNumber}`);
+      console.log(`📱 Extracted recipientPhoneNumber: ${recipientPhoneNumber ? 'Found' : 'Not found'}`);
 
       let phoneNumberId = null;
       if (executionData.user_number) {
@@ -168,7 +226,7 @@ class BolnaApiService {
       } else if (executionData.telephony_data?.from_number) {
         phoneNumberId = executionData.telephony_data.from_number;
       }
-      console.log(`Extracted phoneNumberId: ${phoneNumberId}`);
+      console.log(`☎️ Extracted phoneNumberId: ${phoneNumberId ? 'Found' : 'Not found'}`);
 
       // Extract conversation transcript
       let conversationTranscript = null;
@@ -206,7 +264,7 @@ class BolnaApiService {
         }
       }
 
-      console.log(`Extracted conversation: ${conversationTranscript ? 'Found' : 'Not found'}, Messages: ${conversationMessages.length}`);
+      console.log(`💬 Extracted conversation: ${conversationTranscript ? 'Found' : 'Not found'}, Messages: ${conversationMessages.length}`);
 
       const extracted = {
         callId: callId,
@@ -226,10 +284,10 @@ class BolnaApiService {
         fullData: executionData
       };
 
-      console.log('Extracted call details:', JSON.stringify(extracted, null, 2));
+      console.log('✅ [extractCallDetailsFromExecution] Extraction completed');
       return extracted;
     } catch (error) {
-      console.error('Error extracting call details from execution:', error);
+      console.error('❌ [extractCallDetailsFromExecution] Error:', error.message);
       return null;
     }
   }

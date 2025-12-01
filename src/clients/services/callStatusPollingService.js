@@ -4,7 +4,7 @@
  * Handles recording URL extraction when call completes
  */
 
-const bolnaApiService = require('../../utils/bolnaApi');
+const bolnaApiService = require('../utils/bolnaApi');
 const callHistoryService = require('./callHistoryService');
 const CallRepository = require('../repositories/callRepository');
 
