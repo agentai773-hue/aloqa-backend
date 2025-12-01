@@ -241,6 +241,15 @@ async function resetPasswordWithOTP(req, res) {
       });
     }
 
+    // Check if new password is same as old password
+    const isSamePassword = await user.comparePassword(newPassword);
+    if (isSamePassword) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'New password cannot be the same as your previous password' 
+      });
+    }
+
     // Update password
     user.password = newPassword;
     user.otp = null;

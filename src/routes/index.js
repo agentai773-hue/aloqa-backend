@@ -14,6 +14,7 @@ const callHistoryRoutes = require('../clients/routes/callHistoryRoutes');
 const autoCallRoutes = require('../clients/routes/autoCallRoutes');
 const siteVisitRoutes = require('../clients/routes/siteVisitRoutes');
 const siteUserRoutes = require('../clients/routes/siteUserRoutes');
+const dashboardRoutes = require('../clients/routes/dashboardRoutes');
 
 const router = express.Router();
 
@@ -76,6 +77,9 @@ router.use('/client-site-visits', siteVisitRoutes);
 
 // Site user routes (client)
 router.use('/client-site-users', siteUserRoutes);
+
+// Dashboard routes (client)
+router.use('/client-dashboard', dashboardRoutes);
 
 router.use('/client-auth', clientAuthRoutes);
 
