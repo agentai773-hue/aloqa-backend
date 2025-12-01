@@ -40,5 +40,10 @@ router.post('/import/csv', clientAuthMiddleware, (req, res) =>
   leadController.importLeads(req, res)
 );
 
+// Search leads with filters
+router.post('/search', clientAuthMiddleware, (req, res) =>
+  leadController.searchLeads(req, res)
+);
+
 module.exports = router;
 

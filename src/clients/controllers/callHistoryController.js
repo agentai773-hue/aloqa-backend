@@ -2,16 +2,28 @@ const callHistoryService = require('../services/callHistoryService');
 const callStatusPollingService = require('../services/callStatusPollingService');
 
 class CallHistoryController {
-  // Get all call history for logged-in user
+  // Get all call history for logged-in user with optional filters
   async getCallHistory(req, res) {
     try {
       const userId = req.user._id;
-      const { page = 1, pageSize = 10 } = req.query;
+      const { page = 1, pageSize = 10, status = 'all', assistantId = 'all' } = req.query;
+
+      // Build filters object
+      const filters = {};
+      if (status && status !== 'all') {
+        filters.status = status;
+      }
+      if (assistantId && assistantId !== 'all') {
+        filters.assistantId = assistantId;
+      }
+
+      console.log('getCallHistory - Filters:', filters);
 
       const result = await callHistoryService.getUserCallHistory(
         userId,
         parseInt(page),
-        parseInt(pageSize)
+        parseInt(pageSize),
+        filters
       );
 
       return res.status(200).json({
@@ -192,6 +204,45 @@ class CallHistoryController {
       return res.status(500).json({
         success: false,
         message: error.message || 'Failed to check call status',
+      });
+    }
+  }
+
+  // Search call history by callerName, recipientPhoneNumber, or projectName with optional filters
+  async searchCallHistory(req, res) {
+    try {
+      const userId = req.user._id;
+      const { searchTerm = '', page = 1, pageSize = 10, status = 'all', assistantId = 'all' } = req.body;
+
+      // Build filters object
+      const filters = {};
+      if (status && status !== 'all') {
+        filters.status = status;
+      }
+      if (assistantId && assistantId !== 'all') {
+        filters.assistantId = assistantId;
+      }
+
+      console.log('Search parameters:', { searchTerm, page, pageSize, status, assistantId, filters });
+
+      const result = await callHistoryService.searchCalls(
+        userId,
+        searchTerm ? searchTerm.trim() : '',
+        parseInt(page),
+        parseInt(pageSize),
+        filters
+      );
+
+      return res.status(200).json({
+        success: true,
+        data: result.calls,
+        pagination: result.pagination,
+      });
+    } catch (error) {
+      console.error('Error in searchCallHistory:', error);
+      return res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to search call history',
       });
     }
   }
