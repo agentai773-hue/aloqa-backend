@@ -242,6 +242,24 @@ class LeadService {
       };
     }
   }
+
+  // Search leads with filters
+  async searchLeads(userId, searchTerm = '', page = 1, pageSize = 10, filters = {}) {
+    try {
+      const result = await this.leadRepository.searchLeads(userId, searchTerm, page, pageSize, filters);
+      return {
+        success: true,
+        data: result.leads,
+        pagination: result.pagination,
+        message: 'Leads searched successfully',
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
 }
 
 module.exports = LeadService;

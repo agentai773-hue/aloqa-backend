@@ -37,10 +37,10 @@ class CallHistoryService {
     }
   }
 
-  // Get all call history for a user with pagination
-  async getUserCallHistory(userId, page = 1, pageSize = 10) {
+  // Get all call history for a user with pagination and optional filters
+  async getUserCallHistory(userId, page = 1, pageSize = 10, filters = {}) {
     try {
-      const result = await callHistoryRepository.getRecentCalls(userId, page, pageSize);
+      const result = await callHistoryRepository.getRecentCalls(userId, page, pageSize, filters);
       return result;
     } catch (error) {
       console.error('Error fetching user call history:', error);
@@ -284,6 +284,17 @@ class CallHistoryService {
     } catch (error) {
       console.error('Error updating lead type:', error);
       throw new Error(`Failed to update lead type: ${error.message}`);
+    }
+  }
+
+  // Search calls by callerName, recipientPhoneNumber, or projectName with optional filters
+  async searchCalls(userId, searchTerm, page = 1, pageSize = 10, filters = {}) {
+    try {
+      const result = await callHistoryRepository.searchCalls(userId, searchTerm, page, pageSize, filters);
+      return result;
+    } catch (error) {
+      console.error('Error searching calls:', error);
+      throw new Error(`Failed to search calls: ${error.message}`);
     }
   }
 }

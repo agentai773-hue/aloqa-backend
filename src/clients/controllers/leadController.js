@@ -172,6 +172,48 @@ class LeadController {
       });
     }
   }
+
+  // Search leads with filters
+  async searchLeads(req, res) {
+    try {
+      const userId = req.user._id;
+      const { searchTerm = '', page = 1, pageSize = 10, leadType = 'all', callStatus = 'all', dateRange = 'all' } = req.body;
+
+      // Build filters object
+      const filters = {};
+      if (leadType && leadType !== 'all') {
+        filters.leadType = leadType;
+      }
+      if (callStatus && callStatus !== 'all') {
+        filters.callStatus = callStatus;
+      }
+      if (dateRange && dateRange !== 'all') {
+        filters.dateRange = dateRange;
+      }
+
+      console.log('Search leads parameters:', { searchTerm, page, pageSize, leadType, callStatus, dateRange, filters });
+
+      const result = await this.leadService.searchLeads(
+        userId,
+        searchTerm ? searchTerm.trim() : '',
+        parseInt(page),
+        parseInt(pageSize),
+        filters
+      );
+
+      return res.status(200).json({
+        success: true,
+        data: result.data,
+        pagination: result.pagination,
+      });
+    } catch (error) {
+      console.error('Error in searchLeads:', error);
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
 }
 
 module.exports = LeadController;

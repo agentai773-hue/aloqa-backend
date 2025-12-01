@@ -46,7 +46,9 @@ app.use(cors({
       'http://192.168.2.37:5173',     // Network IP for Admin Panel
       'https://aloqa-admin-panel-frontend.vercel.app', // Vercel deployment
       'http://localhost:8080',
-      'http://localhost:8081'
+      'http://localhost:8081',
+      'https://aloqa-client-side-frontend.vercel.app',
+
     ];
     
     if (allowedOrigins.indexOf(origin) !== -1) {

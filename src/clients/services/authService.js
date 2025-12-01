@@ -47,6 +47,9 @@ async function loginUser(email, password) {
     throw error;
   }
 
+  // Update lastLogin timestamp
+  await user.updateLastLogin();
+
   // Generate JWT token with userId
   const token = jwt.generateToken({ id: user._id, userId: user._id, email: user.email, role: user.role });
   return { token, user };
