@@ -1,9 +1,27 @@
 const express = require('express');
 const LeadController = require('../controllers/leadController');
+const LeadDashboardController = require('../controllers/leadDashboardController');
 const clientAuthMiddleware = require('../../middleware/clientMiddleware');
 
 const router = express.Router();
 const leadController = new LeadController();
+const leadDashboardController = new LeadDashboardController();
+
+/**
+ * Get complete leads dashboard statistics (all counts + leads data)
+ * GET /api/leads/dashboard
+ */
+router.get('/dashboard', clientAuthMiddleware, (req, res) =>
+  leadDashboardController.getLeadsDashboardStats(req, res)
+);
+
+/**
+ * Get leads with filters
+ * POST /api/leads/dashboard/filtered
+ */
+router.post('/dashboard/filtered', clientAuthMiddleware, (req, res) =>
+  leadDashboardController.getLeadsWithFilters(req, res)
+);
 
 // Check if lead exists by contact number
 router.get('/check', clientAuthMiddleware, (req, res) =>
@@ -46,4 +64,3 @@ router.post('/search', clientAuthMiddleware, (req, res) =>
 );
 
 module.exports = router;
-
