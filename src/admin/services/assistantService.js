@@ -112,7 +112,6 @@ class AssistantService {
       }
     };
 
-    console.log('🚀 Creating agent in Bolna AI with payload:', JSON.stringify(bolnaPayload, null, 2));
 
     const response = await axios.post(
       `${BOLNA_API_URL}/v2/agent`,
@@ -125,7 +124,6 @@ class AssistantService {
       }
     );
 
-    console.log('✅ Bolna AI agent created:', response.data);
     return response.data;
   }
 
@@ -169,8 +167,6 @@ class AssistantService {
       throw new Error('No valid fields to update');
     }
 
-    console.log('🔄 Patching agent in Bolna AI:', agentId);
-    console.log('📦 Payload:', JSON.stringify(bolnaPatchPayload, null, 2));
 
     const response = await axios.patch(
       `${BOLNA_API_URL}/v2/agent/${agentId}`,
@@ -183,7 +179,6 @@ class AssistantService {
       }
     );
 
-    console.log('✅ Bolna AI response:', response.data);
     return response.data;
   }
 
@@ -237,7 +232,6 @@ class AssistantService {
 
     const assistant = await assistantRepository.create(dbData);
     
-    console.log('✅ Assistant created successfully');
     return assistant;
   }
 
@@ -281,15 +275,22 @@ class AssistantService {
 
     const updatedAssistant = await assistantRepository.update(id, updateFields);
     
-    console.log('✅ Assistant updated successfully');
     return updatedAssistant;
   }
 
   /**
-   * Get all assistants with filters
+   * Get all assistants with filters and pagination
    */
-  async getAllAssistants(filters) {
-    return await assistantRepository.findAll(filters);
+  async getAllAssistants(filters = {}) {
+    const assistants = await assistantRepository.findAll(filters);
+    const total = await assistantRepository.countAssistants(filters);
+    
+    return {
+      assistants,
+      total,
+      page: filters.page || 1,
+      limit: Math.min(filters.limit || 10, 100) // Limit maximum to 100 items per page
+    };
   }
 
   /**
@@ -330,7 +331,6 @@ class AssistantService {
     if (assistant.agentId && assistant.userId?.bearerToken) {
       try {
         await this.deleteFromBolnaAI(assistant.agentId, assistant.userId.bearerToken);
-        console.log('✅ Deleted from Bolna AI');
       } catch (bolnaError) {
         console.error('❌ Bolna AI delete failed:', bolnaError.response?.data || bolnaError.message);
         const error = new Error('Failed to delete assistant from Bolna AI');
@@ -343,7 +343,6 @@ class AssistantService {
     // Step 2: Delete from database (only if Bolna succeeded)
     await assistantRepository.delete(id);
     
-    console.log('✅ Assistant deleted successfully');
     return { message: 'Assistant deleted successfully' };
   }
 }

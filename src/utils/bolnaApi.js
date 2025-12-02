@@ -32,7 +32,6 @@ class BolnaApiService {
         }
       );
 
-      console.log(`Bolna Execution Details (${executionId}):`, JSON.stringify(response.data, null, 2));
 
       if (response.status === 200) {
         return {
@@ -82,7 +81,6 @@ class BolnaApiService {
         }
       );
 
-      console.log('Bolna Call Initiation Response:', JSON.stringify(response.data, null, 2));
 
       if (response.status === 200 || response.status === 201) {
         // Bolna returns execution_id, run_id in the initial response
@@ -127,7 +125,6 @@ class BolnaApiService {
 
       // Extract call ID (try multiple formats)
       const callId = executionData.call_id || executionData.callId || executionData.id || null;
-      console.log(`Extracted callId: ${callId} (from execution_id: ${executionData.id})`);
 
       // Extract recording URL from telephony_data (Bolna's actual structure)
       let recordingUrl = null;
@@ -136,7 +133,6 @@ class BolnaApiService {
       } else if (executionData.recording_url) {
         recordingUrl = executionData.recording_url;
       }
-      console.log(`Extracted recordingUrl: ${recordingUrl}`);
 
       // Extract duration from telephony_data or direct
       let duration = null;
@@ -147,7 +143,7 @@ class BolnaApiService {
       } else if (executionData.conversation_duration) {
         duration = executionData.conversation_duration;
       }
-      console.log(`Extracted duration: ${duration}`);
+     (`Extracted duration: ${duration}`);
 
       // Extract phone numbers from context or direct
       let recipientPhoneNumber = null;
@@ -158,7 +154,6 @@ class BolnaApiService {
       } else if (executionData.telephony_data?.to_number) {
         recipientPhoneNumber = executionData.telephony_data.to_number;
       }
-      console.log(`Extracted recipientPhoneNumber: ${recipientPhoneNumber}`);
 
       let phoneNumberId = null;
       if (executionData.user_number) {
@@ -168,7 +163,6 @@ class BolnaApiService {
       } else if (executionData.telephony_data?.from_number) {
         phoneNumberId = executionData.telephony_data.from_number;
       }
-      console.log(`Extracted phoneNumberId: ${phoneNumberId}`);
 
       // Extract conversation transcript
       let conversationTranscript = null;
@@ -206,7 +200,6 @@ class BolnaApiService {
         }
       }
 
-      console.log(`Extracted conversation: ${conversationTranscript ? 'Found' : 'Not found'}, Messages: ${conversationMessages.length}`);
 
       const extracted = {
         callId: callId,
@@ -226,7 +219,6 @@ class BolnaApiService {
         fullData: executionData
       };
 
-      console.log('Extracted call details:', JSON.stringify(extracted, null, 2));
       return extracted;
     } catch (error) {
       console.error('Error extracting call details from execution:', error);

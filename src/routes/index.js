@@ -3,6 +3,8 @@ const authRoutes = require('../admin/routes/authRoutes');
 const userRoutes = require('../admin/routes/userRoutes');
 const assistantRoutes = require('../admin/routes/assistantRoutes');
 const phoneNumberRoutes = require('../admin/routes/phoneNumberRoutes');
+const voiceRoutes = require('../admin/routes/voiceRoutes');
+const assignUserVoiceRoutes = require('../admin/routes/assignUserVoiceRoutes');
 const verifyEmailRoutes = require('./verifyEmail');
 const clientAuthRoutes = require('../clients/routes/authRoutes');
 const leadRoutes = require('../clients/routes/leadRoutes');
@@ -44,7 +46,11 @@ router.use('/assistants', assistantRoutes);
 // Phone number management routes
 router.use('/phone-numbers', phoneNumberRoutes);
 
+// Voice management routes
+router.use('/voices', voiceRoutes);
 
+// Voice assignment routes
+router.use('/assign-user-voice', assignUserVoiceRoutes);
 
 // user routes
 

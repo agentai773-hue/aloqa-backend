@@ -36,7 +36,6 @@ class PhoneNumberService {
       queryParams.pattern = pattern;
     }
 
-    console.log('🔍 Searching phone numbers with params:', queryParams);
 
     try {
       const response = await axios.get(`${BOLNA_API_URL}/phone-numbers`, {
@@ -47,7 +46,6 @@ class PhoneNumberService {
         }
       });
 
-      console.log('✅ Search phone numbers response:', response.data);
       return response.data;
     } catch (error) {
       console.error('❌ Bolna search error:', error.response?.data || error.message);
@@ -88,7 +86,6 @@ class PhoneNumberService {
     }
 
     // Buy from Bolna
-    console.log('💰 Purchasing phone number from Bolna:', phoneNumber);
     
     try {
       const response = await axios.post(
@@ -103,7 +100,6 @@ class PhoneNumberService {
       );
 
       const bolnaData = response.data;
-      console.log('✅ Bolna purchase successful:', bolnaData);
 
       // Save to database (NOT assigned yet, status = 'available')
       const newPhoneNumber = await phoneNumberRepository.create({
@@ -120,7 +116,6 @@ class PhoneNumberService {
         purchasedAt: new Date(bolnaData.created_at)
       });
 
-      console.log('✅ Phone number saved to database:', newPhoneNumber._id);
       return newPhoneNumber;
     } catch (error) {
       console.error('❌ Bolna purchase error:', error.response?.data || error.message);
@@ -138,11 +133,9 @@ class PhoneNumberService {
       throw error;
     }
 
-    console.log(`📞 Assigning phone number ${phoneNumberId} to user ${userId}`);
     
     const phoneNumber = await phoneNumberRepository.assignToUser(phoneNumberId, userId, agentId);
     
-    console.log('✅ Phone number assigned successfully');
     return phoneNumber;
   }
 
@@ -150,11 +143,9 @@ class PhoneNumberService {
    * Unassign phone number from user
    */
   async unassignPhoneNumber(phoneNumberId) {
-    console.log(`📞 Unassigning phone number ${phoneNumberId}`);
     
     const phoneNumber = await phoneNumberRepository.unassignFromUser(phoneNumberId);
     
-    console.log('✅ Phone number unassigned successfully');
     return phoneNumber;
   }
 
@@ -202,7 +193,6 @@ class PhoneNumberService {
 
     // If phone number was assigned, delete from Bolna
     if (phoneNumber.userId?.bearerToken) {
-      console.log('🗑️ Deleting phone number from Bolna:', phoneNumber.bolnaPhoneId);
       
       try {
         await axios.delete(
@@ -217,7 +207,6 @@ class PhoneNumberService {
             }
           }
         );
-        console.log('✅ Deleted from Bolna successfully');
       } catch (bolnaError) {
         console.error('❌ Bolna delete error:', bolnaError.response?.data || bolnaError.message);
         const error = new Error('Failed to delete from Bolna. Database not modified.');
@@ -226,12 +215,10 @@ class PhoneNumberService {
         throw error;
       }
     } else {
-      console.log('⚠️ No bearer token found, skipping Bolna deletion');
-    }
+      console.warn('⚠️ Phone number not associated with a user or bearer token missing. Skipping Bolna deletion.');}
 
     // Delete from database
     await phoneNumberRepository.delete(id);
-    console.log('✅ Phone number deleted from database');
     
     return { message: 'Phone number deleted successfully from Bolna and database' };
   }
@@ -260,7 +247,6 @@ class PhoneNumberService {
       throw error;
     }
 
-    console.log('🔍 Fetching purchased phone numbers from Bolna...');
 
     try {
       const response = await axios.get(`${BOLNA_API_URL}/phone-numbers/all`, {
@@ -270,7 +256,6 @@ class PhoneNumberService {
         }
       });
 
-      console.log('✅ Purchased phone numbers fetched:', response.data.length);
       return response.data;
     } catch (error) {
       console.error('❌ Bolna API error:', error.response?.data || error.message);
@@ -326,7 +311,6 @@ class PhoneNumberService {
       { upsert: true, new: true }
     );
 
-    console.log('✅ Phone number assigned:', phoneNumber, 'to user:', userId);
     return assignment;
   }
 

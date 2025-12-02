@@ -160,8 +160,6 @@ This is an automated email. Please do not reply to this message.
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log('✅ Verification email sent successfully to:', user.email);
-    console.log('📧 Message ID:', info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('❌ Failed to send verification email:', error.message);
@@ -234,7 +232,6 @@ const sendWelcomeEmail = async (user) => {
     };
 
     await transporter.sendMail(mailOptions);
-    console.log('✅ Welcome email sent successfully to:', user.email);
     return { success: true };
   } catch (error) {
     console.error('❌ Failed to send welcome email:', error.message);

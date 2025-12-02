@@ -20,7 +20,6 @@ class CallService {
       const isAutoCall = typeof params === 'object' ? params.isAutoCall : false;
       const autoCallAttemptNumber = typeof params === 'object' ? params.autoCallAttemptNumber : 0;
 
-      console.log('📞 Initiating call with params:', { userId, leadId, isAutoCall });
 
       // 1. Get lead details
       const lead = await this.repository.getLeadByIdAndUser(leadId, userId);
@@ -34,7 +33,6 @@ class CallService {
         };
       }
 
-      console.log('✅ Lead found:', lead.full_name);
 
       // 2. Check if lead has a project assigned
       if (!lead.project_name) {
@@ -177,7 +175,6 @@ class CallService {
           }
         }
 
-        console.log('Saving call history with data:', JSON.stringify(historyData, null, 2));
 
         await callHistoryService.saveCallHistory(historyData);
       } catch (historyError) {
@@ -246,7 +243,6 @@ class CallService {
         }
 
         executionAttempts++;
-        console.log(`Execution fetch attempt ${executionAttempts}/${maxAttempts} for ${initialResponse.executionId}`);
       }
 
       // Step 3: Extract call details from execution
@@ -423,7 +419,6 @@ class CallService {
           }
         }
 
-        console.log('Saving call history (custom call) with data:', JSON.stringify(historyData, null, 2));
 
         await callHistoryService.saveCallHistory(historyData);
       } catch (historyError) {

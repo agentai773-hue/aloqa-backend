@@ -21,12 +21,10 @@ class CallStatusPollingService {
    */
   startPolling() {
     if (this.isRunning) {
-      console.log('Call status polling already running');
       return;
     }
 
     this.isRunning = true;
-    console.log('🔄 Starting call status polling service (every 30 seconds)');
 
     // Run immediately, then every 30 seconds
     this.pollCallStatuses();
@@ -44,7 +42,6 @@ class CallStatusPollingService {
       clearInterval(this.pollingInterval);
       this.pollingInterval = null;
       this.isRunning = false;
-      console.log('✋ Stopped call status polling service');
     }
   }
 
@@ -60,7 +57,6 @@ class CallStatusPollingService {
         return; // No pending calls, nothing to do
       }
 
-      console.log(`\n📞 Polling ${pendingCalls.length} pending calls for status updates...`);
 
       for (const call of pendingCalls) {
         await this.checkAndUpdateCallStatus(call);
@@ -92,7 +88,6 @@ class CallStatusPollingService {
       );
 
       if (!executionResponse.success || !executionResponse.data) {
-        console.log(`⚠️ Could not fetch execution ${executionId}`);
         return;
       }
 
@@ -106,7 +101,6 @@ class CallStatusPollingService {
       const statusChanged = call.status !== newStatus;
 
       if (statusChanged) {
-        console.log(`✏️ Call ${executionId} status: ${call.status} → ${newStatus}`);
       }
 
       // If call is completed or failed, or we have new recording data, update it
@@ -136,19 +130,16 @@ class CallStatusPollingService {
         );
 
         if (updated) {
-          console.log(`✅ Updated call ${executionId} - Status: ${newStatus}, Recording: ${callDetails.recordingUrl ? '✓' : '✗'}`);
           
           // Update lead call status if call is completed
           if (newStatus === 'completed' && call.leadId) {
             try {
               await callHistoryService.updateLeadCallStatus(call.leadId, 'completed');
-              console.log(`📞 Updated lead ${call.leadId} call status to completed`);
               
               // Extract and create site visit from transcript if available
               if (callDetails.conversationTranscript) {
                 try {
                   const siteVisitService = require('./siteVisitService');
-                  console.log('📍 Attempting to extract site visit from transcript (polling)...');
                   
                   const siteVisitResult = await siteVisitService.extractAndCreateSiteVisit(
                     call.leadId.toString(),
@@ -157,9 +148,7 @@ class CallStatusPollingService {
                   );
 
                   if (siteVisitResult.success) {
-                    console.log('✅ Site visit created from transcript (polling):', siteVisitResult.data);
                   } else {
-                    console.log('ℹ️ No site visit info in transcript:', siteVisitResult.message);
                   }
                 } catch (siteVisitError) {
                   console.warn('⚠️ Error extracting site visit from polling (non-blocking):', siteVisitError.message);
@@ -173,7 +162,6 @@ class CallStatusPollingService {
 
         // Log status progression for debugging
         if (statusChanged) {
-          console.log(`  Duration: ${callDetails.duration || 0}s, Recording: ${callDetails.recordingUrl || 'Not available'}`);
         }
       }
     } catch (error) {

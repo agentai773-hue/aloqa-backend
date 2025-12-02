@@ -89,18 +89,22 @@ exports.createAssistant = async (req, res) => {
  */
 exports.getAllAssistants = async (req, res) => {
   try {
-    const { userId, status } = req.query;
+    const { userId, status, page, limit, search, agentType } = req.query;
     
     const filters = {};
     if (userId) filters.userId = userId;
     if (status) filters.status = status;
+    if (page) filters.page = parseInt(page);
+    if (limit) filters.limit = Math.min(parseInt(limit), 100); // Limit max to 100
+    if (search) filters.search = search.trim();
+    if (agentType) filters.agentType = agentType;
 
-    const assistants = await assistantService.getAllAssistants(filters);
+    const result = await assistantService.getAllAssistants(filters);
 
     res.json({
       success: true,
-      count: assistants.length,
-      data: assistants
+      message: 'Assistants retrieved successfully',
+      data: result
     });
 
   } catch (error) {

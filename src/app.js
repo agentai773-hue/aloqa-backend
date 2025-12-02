@@ -23,10 +23,7 @@ const autoCallService = require('./clients/services/autoCallService');
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// Debug environment
-console.log('🚀 Starting server...');
-console.log('📍 NODE_ENV:', process.env.NODE_ENV || 'development');
-console.log('🔗 PORT:', PORT);
+
 
 // Connect to MongoDB
 connectDB();
@@ -54,7 +51,6 @@ app.use(cors({
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      console.log('⚠️  CORS blocked origin:', origin);
       callback(null, true); // Allow in development
     }
   },

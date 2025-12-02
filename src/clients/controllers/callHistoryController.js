@@ -17,7 +17,6 @@ class CallHistoryController {
         filters.assistantId = assistantId;
       }
 
-      console.log('getCallHistory - Filters:', filters);
 
       const result = await callHistoryService.getUserCallHistory(
         userId,
@@ -72,7 +71,6 @@ class CallHistoryController {
     try {
       const webhookData = req.body;
 
-      console.log('Received webhook from Bolna:', JSON.stringify(webhookData, null, 2));
 
       // Extract call ID from webhook payload (try multiple formats)
       const callId = webhookData.call_id || webhookData.callId || webhookData.id;
@@ -97,7 +95,6 @@ class CallHistoryController {
       }
       
       if (!updatedCall && executionId) {
-        console.log(`Call not found by callId, trying executionId: ${executionId}`);
         // Update by execution ID instead
         updatedCall = await callHistoryService.updateCallWithExecutionDetails(
           executionId,
@@ -106,7 +103,7 @@ class CallHistoryController {
       }
 
       if (updatedCall) {
-        console.log('Call history updated with webhook data:', updatedCall?._id);
+        console.warn('Call history updated with webhook data:', updatedCall?._id);
       } else {
         console.warn(`Could not find call to update - callId: ${callId}, executionId: ${executionId}`);
       }
@@ -223,7 +220,6 @@ class CallHistoryController {
         filters.assistantId = assistantId;
       }
 
-      console.log('Search parameters:', { searchTerm, page, pageSize, status, assistantId, filters });
 
       const result = await callHistoryService.searchCalls(
         userId,

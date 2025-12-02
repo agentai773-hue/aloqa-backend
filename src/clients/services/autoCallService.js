@@ -19,7 +19,6 @@ class AutoCallService {
    */
   startAutoCall() {
     if (this.isRunning) {
-      console.log('✅ Auto-call service already running');
       return {
         success: true,
         message: 'Auto-call service is already running',
@@ -28,7 +27,6 @@ class AutoCallService {
     }
 
     this.isRunning = true;
-    console.log('🔄 Starting auto-call service (every 2 minutes)');
 
     // Run immediately, then every 2 minutes
     this.processPendingLeads();
@@ -52,7 +50,6 @@ class AutoCallService {
       clearInterval(this.pollingInterval);
       this.pollingInterval = null;
       this.isRunning = false;
-      console.log('✋ Stopped auto-call service');
       return {
         success: true,
         message: 'Auto-call service stopped',
@@ -90,7 +87,6 @@ class AutoCallService {
         return;
       }
 
-      console.log(`\n📞 Auto-call: Processing ${pendingLeads.length} pending leads...`);
 
       for (const lead of pendingLeads) {
         await this.callLead(lead);
@@ -107,7 +103,6 @@ class AutoCallService {
     try {
       const { _id: leadId, user_id: userId, contact_number, project_name, full_name } = lead;
 
-      console.log(`📱 Auto-calling: ${full_name} (${contact_number})`);
 
       const result = await callService.initiateCall({
         userId: userId,
@@ -118,7 +113,7 @@ class AutoCallService {
       });
 
       if (result.success) {
-        console.log(`✅ Auto-call initiated: ${full_name}`);
+        console.warn(`✅ Auto-call initiated: ${full_name}`);
       } else {
         console.error(`❌ Auto-call failed for ${full_name}:`, result.error);
       }

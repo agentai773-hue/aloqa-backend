@@ -33,7 +33,6 @@ class UserService {
 
     // Send verification email - REQUIRED (will throw error if fails)
     await sendVerificationEmail(user, verificationToken);
-    console.log('✅ User created and verification email sent to:', user.email);
 
     return user;
   }

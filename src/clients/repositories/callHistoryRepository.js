@@ -162,7 +162,6 @@ class CallHistoryRepository {
       }
     }
 
-    console.log('Executing search with query:', JSON.stringify(query, null, 2));
     
     const calls = await CallHistory.find(query)
       .sort({ createdAt: -1 })
@@ -174,7 +173,6 @@ class CallHistoryRepository {
     
     const total = await CallHistory.countDocuments(query);
 
-    console.log(`Found ${calls.length} results out of ${total} matching records`);
     
     return {
       calls,

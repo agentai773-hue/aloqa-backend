@@ -164,8 +164,7 @@ class SiteVisitService {
         }
       }
 
-      console.log('📄 Parsing transcript for site visit info');
-      console.log('📝 Transcript text:', transcriptText.substring(0, 300) + '...');
+   
 
       let visitDate = null;
       let visitTime = null;
@@ -214,7 +213,6 @@ class SiteVisitService {
               }
               
               visitDate = targetDate;
-              console.log('✅ Found word-form date:', dayWord, month, '->', visitDate);
               break;
             }
           }
@@ -239,7 +237,6 @@ class SiteVisitService {
               
               visitDate = new Date(today);
               visitDate.setDate(visitDate.getDate() + daysToAdd);
-              console.log('✅ Found day name:', day, '->', visitDate);
               break;
             }
           }
@@ -260,7 +257,6 @@ class SiteVisitService {
               const parsed = new Date(dateMatch[1], dateMatch[2] - 1, dateMatch[3]);
               if (!isNaN(parsed.getTime()) && parsed > new Date()) {
                 visitDate = parsed;
-                console.log('✅ Found numeric date:', dateMatch[0], '->', visitDate);
                 break;
               }
             } catch (e) {
@@ -287,11 +283,9 @@ class SiteVisitService {
           
           if (nearbyText.includes('pm')) {
             visitTime = `${String(hour + 12).padStart(2, '0')}:00`; // Convert to 24-hour
-            console.log('✅ Found word-form PM time:', word, 'PM', '->', visitTime);
             break;
           } else if (nearbyText.includes('am') || word === 'one' || word === 'two') {
             visitTime = `${String(hour).padStart(2, '0')}:00`;
-            console.log('✅ Found word-form AM time:', word, 'AM', '->', visitTime);
             break;
           }
         }
@@ -321,7 +315,6 @@ class SiteVisitService {
             }
             
             visitTime = `${String(hour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-            console.log('✅ Found numeric time:', fullMatch, '->', visitTime);
             break;
           }
         }
@@ -339,7 +332,6 @@ class SiteVisitService {
             .split(' ')
             .map(word => word.charAt(0).toUpperCase() + word.slice(1))
             .join(' ');
-          console.log('✅ Found project keyword:', projectName);
           break;
         }
       }
@@ -355,7 +347,6 @@ class SiteVisitService {
         const addressMatch = transcriptText.match(pattern);
         if (addressMatch && addressMatch[1]) {
           address = addressMatch[1].trim().substring(0, 100);
-          console.log('✅ Found address:', address);
           break;
         }
       }
@@ -363,10 +354,7 @@ class SiteVisitService {
       // ============ VALIDATE AND RETURN ============
       // Need at least time + project, date is optional (will default to tomorrow)
       if (!visitTime || !projectName) {
-        console.log(
-          '❌ Incomplete site visit info:',
-          { hasDate: !!visitDate, hasTime: !!visitTime, hasProject: !!projectName }
-        );
+     
         return null;
       }
 
@@ -374,10 +362,8 @@ class SiteVisitService {
       if (!visitDate) {
         visitDate = new Date();
         visitDate.setDate(visitDate.getDate() + 1); // Default to tomorrow
-        console.log('⚠️ No date found, using tomorrow as default:', visitDate);
       }
 
-      console.log('✅ Site visit info found - creating record');
       return {
         visitDate,
         visitTime: this.normalizeTime(visitTime),

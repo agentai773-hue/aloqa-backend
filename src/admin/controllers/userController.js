@@ -66,7 +66,7 @@ const createUser = async (req, res) => {
 // @access  Private (Admin only)
 const getAllUsers = async (req, res) => {
   try {
-    const { page, limit, isApproval } = req.query;
+    const { page, limit, isApproval, search, status, approval } = req.query;
     
     const filters = {};
     if (isApproval !== undefined) {
@@ -74,6 +74,9 @@ const getAllUsers = async (req, res) => {
     }
     if (page) filters.page = parseInt(page);
     if (limit) filters.limit = parseInt(limit);
+    if (search) filters.search = search.trim();
+    if (status) filters.status = status;
+    if (approval) filters.approval = approval;
 
     const result = await userService.getAllUsers(filters);
 
