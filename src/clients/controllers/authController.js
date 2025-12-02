@@ -9,18 +9,30 @@ async function login(req, res) {
   try {
     const { email, password } = req.body;
     const { token, user } = await loginUser(email, password);
-    // Set cookie that can be managed by frontend for logout
+    
+    // Set cookie with proper security settings
     const cookieOptions = {
-      httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production' ? true : false,
+      sameSite: 'lax', // Use 'lax' for better cross-site cookie handling
       maxAge: 10 * 24 * 60 * 60 * 1000, // 10 days
+      path: '/', // Ensure cookie is available across all paths
     };
+    
+    console.log('✅ Login successful for user:', email);
     res.cookie('token', token, cookieOptions);
-    res.json({ token, user });
+    
+    res.status(200).json({ 
+      success: true,
+      token, 
+      user,
+      message: 'Login successful'
+    });
   } catch (err) {
     const statusCode = err.statusCode || 401;
+    console.error('❌ Login failed:', err.message);
     res.status(statusCode).json({ 
+      success: false,
       message: err.message,
       code: err.code 
     });
@@ -29,14 +41,25 @@ async function login(req, res) {
 
 async function logout(req, res) {
   try {
+    // Clear the token cookie
     res.clearCookie('token', {
-      httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production' ? true : false,
       sameSite: 'lax',
+      path: '/',
     });
-    res.json({ message: 'Logged out successfully' });
+    
+    console.log('✅ Logout successful');
+    res.status(200).json({ 
+      success: true,
+      message: 'Logged out successfully' 
+    });
   } catch (err) {
-    res.status(500).json({ message: 'Logout failed' });
+    console.error('❌ Logout failed:', err.message);
+    res.status(500).json({ 
+      success: false,
+      message: 'Logout failed' 
+    });
   }
 }
 
@@ -51,29 +74,66 @@ async function verify(req, res) {
     }
     
     if (!token) {
-      return res.status(401).json({ message: 'No token provided' });
+      return res.status(401).json({ 
+        success: false,
+        message: 'No token provided' 
+      });
     }
 
     const decoded = jwt.verifyToken(token);
     
-    // Fetch user from database to get bearerToken
+    // Fetch user from database to get all required fields
     const user = await User.findById(decoded.id).select(
-      'firstName lastName email mobile companyName role bearerToken isApproval'
+      'firstName lastName email mobile companyName role bearerToken isApproval isActive'
     );
     
     if (!user) {
-      return res.status(401).json({ message: 'User not found' });
+      return res.status(401).json({ 
+        success: false,
+        message: 'User not found' 
+      });
     }
 
-    // Create response object with bearerToken
+    // Check if user is still active and approved
+    if (user.isActive !== 1) {
+      return res.status(403).json({
+        success: false,
+        message: 'User account is not active'
+      });
+    }
+
+    if (user.isApproval !== 1) {
+      return res.status(403).json({
+        success: false,
+        message: 'User account is not approved'
+      });
+    }
+
+    // Create response object with all required fields
     const userResponse = {
-      ...decoded,
+      _id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      mobile: user.mobile,
+      companyName: user.companyName,
+      role: user.role,
+      isApproval: user.isApproval,
       bearerToken: user.bearerToken
     };
 
-    res.json({ token, user: userResponse });
+    console.log('✅ Token verified for user:', user.email);
+    res.status(200).json({ 
+      success: true,
+      token, 
+      user: userResponse 
+    });
   } catch (err) {
-    res.status(401).json({ message: 'Invalid or expired token' });
+    console.error('❌ Token verification failed:', err.message);
+    res.status(401).json({ 
+      success: false,
+      message: 'Invalid or expired token' 
+    });
   }
 }
 

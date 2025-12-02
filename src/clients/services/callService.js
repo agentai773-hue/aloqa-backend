@@ -2,7 +2,7 @@
 const axios = require('axios');
 const CallRepository = require('../repositories/callRepository');
 const callHistoryService = require('./callHistoryService');
-const bolnaApiService = require('../../utils/bolnaApi');
+const bolnaApiService = require('../utils/bolnaApi');
 
 class CallService {
   constructor() {
