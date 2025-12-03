@@ -12,6 +12,7 @@ const assignAssistantPhoneRoutes = require('../clients/routes/assignAssistantPho
 const callRoutes = require('../clients/routes/callRoutes');
 const callHistoryRoutes = require('../clients/routes/callHistoryRoutes');
 const autoCallRoutes = require('../clients/routes/autoCallRoutes');
+const scheduledCallsRoutes = require('../clients/routes/scheduledCallsRoutes');
 const siteVisitRoutes = require('../clients/routes/siteVisitRoutes');
 const siteUserRoutes = require('../clients/routes/siteUserRoutes');
 const dashboardRoutes = require('../clients/routes/dashboardRoutes');
@@ -71,6 +72,9 @@ router.use('/client-call', callHistoryRoutes);
 
 // Auto-call routes (client)
 router.use('/client-call', autoCallRoutes);
+
+// Scheduled calls routes (client)
+router.use('/client-calls', scheduledCallsRoutes);
 
 // Site visit routes (client)
 router.use('/client-site-visits', siteVisitRoutes);

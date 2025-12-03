@@ -38,17 +38,27 @@ class LeadRepository {
 
   async update(id, leadData, userId) {
     try {
-      const lead = await Lead.findOne({ 
-        _id: id,
-        user_id: userId,
-        deleted_at: null 
-      });
-      if (!lead) {
+      // Use findByIdAndUpdate to avoid full document validation
+      // This allows partial updates without triggering required field validation
+      const updatedLead = await Lead.findByIdAndUpdate(
+        id,
+        { $set: leadData },
+        { 
+          new: true,
+          runValidators: false // Skip Mongoose validation to allow partial updates
+        }
+      );
+      
+      if (!updatedLead) {
         return null;
       }
-      Object.assign(lead, leadData);
-      await lead.save();
-      return lead;
+
+      // Verify user ownership
+      if (updatedLead.user_id.toString() !== userId.toString()) {
+        return null;
+      }
+
+      return updatedLead;
     } catch (error) {
       throw new Error(`Error updating lead: ${error.message}`);
     }

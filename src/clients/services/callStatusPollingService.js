@@ -1,7 +1,12 @@
 /**
  * Call Status Polling Service
- * Periodically checks Bolna for call status updates and saves to database
- * Handles recording URL extraction when call completes
+ * NO LONGER USES POLLING - Now uses WEBHOOK + CRON JOBS ONLY
+ * 
+ * This service is kept ONLY for:
+ * 1. Safety check for stalled calls (runs via cron job daily at 3 PM)
+ * 2. Manual status checks (when user explicitly requests)
+ * 
+ * NO POLLING ANYMORE - All real-time updates via webhook callbacks
  */
 
 const bolnaApiService = require('../utils/bolnaApi');
@@ -11,67 +16,48 @@ const CallRepository = require('../repositories/callRepository');
 class CallStatusPollingService {
   constructor() {
     this.repository = new CallRepository();
-    this.isRunning = false;
-    this.pollingInterval = null;
   }
 
-  /**
-   * Start the polling service
-   * Runs every 30 seconds to check pending calls
-   */
-  startPolling() {
-    if (this.isRunning) {
-      console.log('Call status polling already running');
-      return;
-    }
 
-    this.isRunning = true;
-    console.log('🔄 Starting call status polling service (every 30 seconds)');
-
-    // Run immediately, then every 30 seconds
-    this.pollCallStatuses();
-
-    this.pollingInterval = setInterval(() => {
-      this.pollCallStatuses();
-    }, 30000); // 30 seconds
-  }
-
-  /**
-   * Stop the polling service
-   */
-  stopPolling() {
-    if (this.pollingInterval) {
-      clearInterval(this.pollingInterval);
-      this.pollingInterval = null;
-      this.isRunning = false;
-      console.log('✋ Stopped call status polling service');
-    }
-  }
-
-  /**
-   * Poll all pending calls and update their status
-   */
-  async pollCallStatuses() {
+  async safetyCheckStalledCalls() {
     try {
-      // Get all calls that are still pending (not completed/failed)
-      const pendingCalls = await this.repository.getPendingCalls();
+      console.log('🔍 Safety check: Looking for stalled calls (no webhook callback for 1+ hour)...');
 
-      if (pendingCalls.length === 0) {
-        return; // No pending calls, nothing to do
+      // Find calls that are still "in_progress" but haven't been updated in 1+ hour
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      const stalledCalls = await this.repository.findCalls({
+        status: { $in: ['in_progress', 'initiated'] },
+        lastStatusCheck: { $lt: oneHourAgo },
+      });
+
+      if (stalledCalls.length === 0) {
+        console.log('✅ No stalled calls found');
+        return { success: true, checked: 0, updated: 0 };
       }
 
-      console.log(`\n📞 Polling ${pendingCalls.length} pending calls for status updates...`);
+      console.log(`⚠️  Found ${stalledCalls.length} stalled calls - checking Bolna for status...`);
 
-      for (const call of pendingCalls) {
-        await this.checkAndUpdateCallStatus(call);
+      let updatedCount = 0;
+      for (const call of stalledCalls) {
+        try {
+          await this.checkAndUpdateCallStatus(call);
+          updatedCount++;
+        } catch (err) {
+          console.error(`Error checking stalled call ${call.executionId}:`, err.message);
+        }
       }
+
+      console.log(`✅ Safety check complete: checked ${stalledCalls.length}, updated ${updatedCount}`);
+      return { success: true, checked: stalledCalls.length, updated: updatedCount };
     } catch (error) {
-      console.error('Error in pollCallStatuses:', error);
+      console.error('Error in safetyCheckStalledCalls:', error);
+      return { success: false, error: error.message };
     }
   }
 
   /**
    * Check status of a single call and update if changed
+   * Used only by safety check and manual status checks
    */
   async checkAndUpdateCallStatus(call) {
     try {
@@ -148,7 +134,7 @@ class CallStatusPollingService {
               if (callDetails.conversationTranscript) {
                 try {
                   const siteVisitService = require('./siteVisitService');
-                  console.log('📍 Attempting to extract site visit from transcript (polling)...');
+                  console.log('📍 Attempting to extract site visit from transcript (safety check)...');
                   
                   const siteVisitResult = await siteVisitService.extractAndCreateSiteVisit(
                     call.leadId.toString(),
@@ -157,12 +143,12 @@ class CallStatusPollingService {
                   );
 
                   if (siteVisitResult.success) {
-                    console.log('✅ Site visit created from transcript (polling):', siteVisitResult.data);
+                    console.log('✅ Site visit created from transcript (safety check):', siteVisitResult.data);
                   } else {
                     console.log('ℹ️ No site visit info in transcript:', siteVisitResult.message);
                   }
                 } catch (siteVisitError) {
-                  console.warn('⚠️ Error extracting site visit from polling (non-blocking):', siteVisitError.message);
+                  console.warn('⚠️ Error extracting site visit from safety check (non-blocking):', siteVisitError.message);
                 }
               }
             } catch (err) {
@@ -183,6 +169,7 @@ class CallStatusPollingService {
 
   /**
    * Manually trigger a status check for a specific call
+   * Used when user explicitly requests status update
    */
   async checkCallStatus(callId) {
     try {

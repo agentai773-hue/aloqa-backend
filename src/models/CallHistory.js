@@ -115,9 +115,25 @@ const callHistorySchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    autoCallAttemptNumber: {
+    // Number of attempts for this lead - now limited to 1
+    callAttemptNumber: {
       type: Number,
       default: 0,
+    },
+    // Scheduled call time - when this lead should be called next
+    scheduledCallTime: {
+      type: Date,
+      default: null,
+    },
+    // Reason why this call is scheduled (extracted from transcript)
+    scheduledCallReason: {
+      type: String,
+      default: null,
+    },
+    // Flag to mark if this call's transcript has been analyzed
+    transcriptAnalyzed: {
+      type: Boolean,
+      default: false,
     },
   },
   {
@@ -131,5 +147,7 @@ callHistorySchema.index({ leadId: 1 });
 callHistorySchema.index({ callId: 1 });
 callHistorySchema.index({ executionId: 1 });
 callHistorySchema.index({ runId: 1 });
+// Index for scheduled calls query
+callHistorySchema.index({ scheduledCallTime: 1, transcriptAnalyzed: 1 });
 
 module.exports = mongoose.model('CallHistory', callHistorySchema);

@@ -2,6 +2,7 @@
 const axios = require('axios');
 const CallRepository = require('../repositories/callRepository');
 const callHistoryService = require('./callHistoryService');
+const callPollingService = require('./callPollingService');
 const bolnaApiService = require('../utils/bolnaApi');
 
 class CallService {
@@ -137,11 +138,47 @@ class CallService {
       const bolnaResponse = await this.makeCallToBolnaAPI(bolnaPayload, bearerToken);
 
       if (!bolnaResponse.success) {
+        console.error(`❌ Bolna API failed - NOT marking lead. Error:`, bolnaResponse.error);
         return {
           success: false,
           statusCode: 400,
           message: bolnaResponse.error || 'Failed to initiate call',
           details: bolnaResponse.details
+        };
+      }
+
+      console.log(`✅ Bolna API succeeded - NOW MARKING LEAD as has_been_called=true`);
+
+      // 🔴 IMMEDIATELY MARK LEAD AS CALLED after successful API call
+      // This is the ATOMIC operation that prevents duplicate calls
+      // We set multiple fields atomically in ONE operation
+      try {
+        const Lead = require('../../models/Lead');
+        const markedLead = await Lead.findByIdAndUpdate(
+          leadId, 
+          {
+            $set: { 
+              has_been_called: true,           // ← PERMANENT FLAG: Once true, NEVER call again
+              call_status: 'connected',        // ← Set status immediately
+              last_auto_call_attempt: new Date()
+            }
+          }, 
+          { new: true, runValidators: false }
+        );
+        console.log(`✅ Lead ${leadId} marked: has_been_called=true, status=connected`);
+        console.log(`🔴 [CRITICAL] Verifying save - has_been_called value: ${markedLead.has_been_called}`);
+        
+        // Double-check by fetching fresh from DB
+        const verifyLead = await Lead.findById(leadId).select('has_been_called call_status');
+        console.log(`🔴 [VERIFICATION] Fresh fetch from DB - has_been_called: ${verifyLead.has_been_called}, call_status: ${verifyLead.call_status}`);
+      } catch (markError) {
+        console.error('❌ ERROR: Failed to mark lead - ABORTING call process', markError.message);
+        // This is CRITICAL - if we can't mark the lead, we must return error
+        // Otherwise the lead may be called again
+        return {
+          success: false,
+          statusCode: 500,
+          message: 'Failed to mark lead as called - call may have been initiated but not marked'
         };
       }
 
@@ -167,7 +204,6 @@ class CallService {
           autoCallAttemptNumber: autoCallAttemptNumber,
         };
 
-        // If we have callDetails from execution, use them to fill in missing data
         if (bolnaResponse.callDetails) {
           if (!historyData.callId && bolnaResponse.callDetails.callId) {
             historyData.callId = bolnaResponse.callDetails.callId;
@@ -177,12 +213,75 @@ class CallService {
           }
         }
 
-        console.log('Saving call history with data:', JSON.stringify(historyData, null, 2));
+        let historyRecord = null;
+        try {
+          historyRecord = await callHistoryService.saveCallHistory(historyData);
+          console.log(`✅ CallHistory created: ${historyRecord._id}`);
+        } catch (historyError) {
+          console.error('❌ Error saving call history:', historyError.message);
+        }
 
-        await callHistoryService.saveCallHistory(historyData);
+        // ⚠️  NOTE: has_been_called and call_status already set above (atomically)
+        // We already did the update when marking the lead right after Bolna API success
+        // No need to update again here - prevents unnecessary database operations
+        
+        // Emit WebSocket event to notify frontend that call is connected
+        try {
+          const app = require('../../../app');
+          const io = app?.locals?.io;
+          
+          if (io && userId) {
+            const roomName = `user:${userId}`;
+            console.log(`\n🔴🔴🔴 [CallService] EMITTING WebSocket Event 🔴🔴🔴`);
+            console.log(`   - userId: ${userId}`);
+            console.log(`   - leadId: ${leadId}`);
+            console.log(`   - Room: ${roomName}`);
+            console.log(`   - Event: call:status-updated`);
+            console.log(`   - New Status: connected`);
+            console.log(`   - callId: ${historyRecord?._id}`);
+            
+            // Get connected clients in the room for debugging
+            const socketsInRoom = io.sockets.adapter.rooms?.get(roomName)?.size || 0;
+            console.log(`   - Total clients in room: ${socketsInRoom}`);
+            
+            if (socketsInRoom === 0) {
+              console.warn(`⚠️  ⚠️  ⚠️  WARNING: NO CLIENTS in room ${roomName} - Event will NOT be received!`);
+            }
+            
+            const eventData = {
+              callId: historyRecord?._id,
+              status: 'connected',
+              leadId: leadId.toString(),
+              leadType: lead.lead_type,
+              timestamp: new Date().toISOString()
+            };
+            
+            console.log(`   - Event Data:`, JSON.stringify(eventData, null, 2));
+            
+            io.to(roomName).emit('call:status-updated', eventData);
+            console.log(`✅ ✅ ✅ [CallService] WebSocket event EMITTED successfully\n`);
+          } else {
+            console.warn(`⚠️  [CallService] Could not emit WebSocket - io:${!!io}, userId:${userId}`);
+          }
+        } catch (wsError) {
+          console.error(`❌ ❌ ❌ [CallService] Error emitting WebSocket on call init:`, wsError.message);
+          console.error(wsError);
+        }
+        
+        // Start background polling for call completion
+        if (bolnaResponse.executionId) {
+          console.log(`⏳ Starting polling for execution ${bolnaResponse.executionId}`);
+          callPollingService.startPollingExecution(
+            bolnaResponse.executionId,
+            leadId,
+            userId,
+            600000
+          ).catch(error => {
+            console.error('❌ Polling error:', error.message);
+          });
+        }
       } catch (historyError) {
-        console.error('Failed to save call history:', historyError);
-        // Don't return error, call was initiated successfully
+        console.error('❌ Error in call history handling:', historyError.message);
       }
 
       return {

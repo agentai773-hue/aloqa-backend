@@ -1,5 +1,6 @@
 const callHistoryService = require('../services/callHistoryService');
 const callStatusPollingService = require('../services/callStatusPollingService');
+const transcriptAnalysisService = require('../services/transcriptAnalysisService');
 
 class CallHistoryController {
   // Get all call history for logged-in user with optional filters
@@ -71,14 +72,19 @@ class CallHistoryController {
   async handleCallWebhook(req, res) {
     try {
       const webhookData = req.body;
+      const io = req.app.locals.io;
 
-      console.log('Received webhook from Bolna:', JSON.stringify(webhookData, null, 2));
+      console.log('\n📍📍📍 WEBHOOK RECEIVED FROM BOLNA 📍📍📍');
+      console.log('Full webhook payload:', JSON.stringify(webhookData, null, 2));
 
       // Extract call ID from webhook payload (try multiple formats)
       const callId = webhookData.call_id || webhookData.callId || webhookData.id;
       const executionId = webhookData.execution_id || webhookData.executionId;
 
+      console.log(`🔍 Looking for call - callId: ${callId}, executionId: ${executionId}`);
+
       if (!callId && !executionId) {
+        console.warn('⚠️  No call ID or execution ID in webhook data');
         return res.status(400).json({
           success: false,
           message: 'Call ID or Execution ID is required in webhook data',
@@ -90,6 +96,7 @@ class CallHistoryController {
       let updatedCall = null;
       
       if (callId) {
+        console.log(`⏳ Attempting to update call with callId: ${callId}`);
         updatedCall = await callHistoryService.updateCallWithWebhookData(
           callId,
           webhookData
@@ -97,7 +104,7 @@ class CallHistoryController {
       }
       
       if (!updatedCall && executionId) {
-        console.log(`Call not found by callId, trying executionId: ${executionId}`);
+        console.log(`⏳ Call not found by callId, trying executionId: ${executionId}`);
         // Update by execution ID instead
         updatedCall = await callHistoryService.updateCallWithExecutionDetails(
           executionId,
@@ -106,9 +113,80 @@ class CallHistoryController {
       }
 
       if (updatedCall) {
-        console.log('Call history updated with webhook data:', updatedCall?._id);
+        console.log(`✅ Call history updated with webhook - ID: ${updatedCall?._id}`);
+        console.log(`📌 updatedCall.leadId:`, updatedCall.leadId);
+        console.log(`📌 updatedCall.userId:`, updatedCall.userId);
+        console.log(`📌 updatedCall.status:`, updatedCall.status);
+
+        // Map CallHistory status to Lead call_status for frontend display
+        // CallHistory has: initiated, queued, ringing, connected, in-progress, completed, failed, cancelled
+        // Lead needs: pending, connected, not_connected, callback, completed, scheduled
+        if (updatedCall.leadId) {
+          let leadCallStatus = 'pending';
+          
+          if (updatedCall.status === 'connected' || updatedCall.status === 'in-progress') {
+            leadCallStatus = 'connected';  // Call is active
+          } else if (updatedCall.status === 'completed') {
+            leadCallStatus = 'completed';  // Call finished
+          } else if (updatedCall.status === 'failed' || updatedCall.status === 'cancelled') {
+            leadCallStatus = 'not_connected';  // Call failed
+          } else if (updatedCall.status === 'initiated' || updatedCall.status === 'queued' || updatedCall.status === 'ringing') {
+            leadCallStatus = 'connected';  // Call is attempting
+          }
+          
+          console.log(`🔄 Mapping CallHistory status "${updatedCall.status}" → Lead call_status "${leadCallStatus}"`);
+          
+          // Update Lead's call_status so frontend shows real-time updates
+          try {
+            const Lead = require('../../models/Lead');
+            const updatedLead = await Lead.findByIdAndUpdate(
+              updatedCall.leadId,
+              { call_status: leadCallStatus },
+              { new: true }
+            );
+            console.log(`✅ Lead ${updatedCall.leadId} call_status updated to: ${leadCallStatus}`);
+            console.log(`✅ Updated Lead data:`, { _id: updatedLead._id, call_status: updatedLead.call_status });
+          } catch (error) {
+            console.error(`❌ Could not update Lead call_status:`, error.message);
+            console.error(`❌ Full error:`, error);
+          }
+        } else {
+          console.warn(`⚠️  updatedCall.leadId is missing - cannot update Lead call_status`);
+        }
+
+        // Analyze transcript if call is completed
+        if (updatedCall.status === 'completed') {
+          console.log('🔍 Analyzing call transcript...');
+          const analysisResult = await transcriptAnalysisService.analyzeTranscript(updatedCall._id);
+          
+          if (analysisResult.success) {
+            console.log('✅ Transcript analyzed:', analysisResult.leadType);
+          }
+        }
+
+        // Emit real-time update via WebSocket
+        if (io && updatedCall.userId) {
+          const roomName = `user:${updatedCall.userId}`;
+          console.log(`📡 [WebhookController] Emitting WebSocket event to room: ${roomName}`);
+          console.log(`📡 [WebhookController] Event: call:status-updated | Status: ${updatedCall.status}`);
+          
+          // Get connected clients in the room for debugging
+          const socketsInRoom = io.sockets.adapter.rooms?.get(roomName)?.size || 0;
+          console.log(`📊 [WebhookController] Clients in room ${roomName}: ${socketsInRoom}`);
+          
+          io.to(roomName).emit('call:status-updated', {
+            callId: updatedCall._id,
+            status: updatedCall.status,
+            leadId: updatedCall.leadId,
+            leadType: updatedCall.leadType,
+            timestamp: new Date()
+          });
+          console.log('✅ [WebhookController] WebSocket event emitted successfully');
+        } else {
+          console.warn(`⚠️  [WebhookController] Could not emit WebSocket event - io:${!!io}, userId:${updatedCall.userId}`);
+        }
       } else {
-        console.warn(`Could not find call to update - callId: ${callId}, executionId: ${executionId}`);
+        console.warn(`❌ Could not find call to update - callId: ${callId}, executionId: ${executionId}`);
       }
 
       // Respond to Bolna API
@@ -117,7 +195,7 @@ class CallHistoryController {
         message: 'Webhook processed successfully',
       });
     } catch (error) {
-      console.error('Error in handleCallWebhook:', error);
+      console.error('❌ Error in handleCallWebhook:', error);
       // Still return 200 to acknowledge receipt to Bolna
       return res.status(200).json({
         success: false,

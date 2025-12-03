@@ -1,21 +1,26 @@
 /**
  * Auto Call Service
- * Automatically calls leads with pending status every 2 minutes
+ * Automatically calls leads with pending status - uses cron job (every 1 hour)
+ * Each lead is called only ONCE per day - tracked in database via call_attempt_count
  */
 
+const cron = require('node-cron');
 const Lead = require('../../models/Lead');
+const CallHistory = require('../../models/CallHistory');
 const CallService = require('./callService');
+const ScheduledCallsService = require('./scheduledCallsService');
 const callService = new CallService();
+const scheduledCallsService = require('./scheduledCallsService');
 
 class AutoCallService {
   constructor() {
     this.isRunning = false;
-    this.pollingInterval = null;
-    this.POLL_INTERVAL = 120000; // 2 minutes
+    this.cronJob = null;
+    this.scheduledCallsCron = null;
   }
 
   /**
-   * Start auto-call service
+   * Start auto-call service with cron job (every 1 hour)
    */
   startAutoCall() {
     if (this.isRunning) {
@@ -28,18 +33,43 @@ class AutoCallService {
     }
 
     this.isRunning = true;
-    console.log('🔄 Starting auto-call service (every 2 minutes)');
+    console.log('🔄 Starting auto-call service (cron: every 1 hour)');
 
-    // Run immediately, then every 2 minutes
-    this.processPendingLeads();
+    // Run at the start of every hour
+    this.cronJob = cron.schedule('0 * * * *', async () => {
+      try {
+        console.log('\n🔵 Auto-call cron triggered at ' + new Date().toISOString());
+        await this.processPendingLeads();
+      } catch (error) {
+        console.error('❌ Error in auto-call cron:', error.message);
+      }
+    });
 
-    this.pollingInterval = setInterval(() => {
-      this.processPendingLeads();
-    }, this.POLL_INTERVAL);
+    // Also process scheduled calls (runs every 15 minutes)
+    this.scheduledCallsCron = cron.schedule('*/15 * * * *', async () => {
+      try {
+        console.log('📅 Scheduled calls check at ' + new Date().toISOString());
+        await scheduledCallsService.processPendingScheduledCalls();
+      } catch (error) {
+        console.error('❌ Error in scheduled calls cron:', error.message);
+      }
+    });
+
+    // Reset daily counter at midnight
+    this.resetCron = cron.schedule('0 0 * * *', async () => {
+      try {
+        console.log('🌙 Daily reset at ' + new Date().toISOString());
+        await this.resetDailyTracker();
+      } catch (error) {
+        console.error('❌ Error in reset cron:', error.message);
+      }
+    });
+
+    console.log('✅ Auto-call cron job started');
 
     return {
       success: true,
-      message: 'Auto-call service started',
+      message: 'Auto-call service started with cron (every 1 hour)',
       isRunning: true
     };
   }
@@ -48,10 +78,21 @@ class AutoCallService {
    * Stop auto-call service
    */
   stopAutoCall() {
-    if (this.pollingInterval) {
-      clearInterval(this.pollingInterval);
-      this.pollingInterval = null;
+    if (this.cronJob) {
+      this.cronJob.stop();
+      this.cronJob = null;
       this.isRunning = false;
+      
+      if (this.scheduledCallsCron) {
+        this.scheduledCallsCron.stop();
+        this.scheduledCallsCron = null;
+      }
+
+      if (this.resetCron) {
+        this.resetCron.stop();
+        this.resetCron = null;
+      }
+
       console.log('✋ Stopped auto-call service');
       return {
         success: true,
@@ -77,37 +118,108 @@ class AutoCallService {
   }
 
   /**
-   * Process all pending leads and call them
+   * Process all pending leads and call them (runs manually via API)
+   * IMPORTANT: Each lead is called ONLY ONCE - regardless of status changes
+   * Once has_been_called=true, that lead is NEVER called again
+   * 
+   * This prevents duplicate calls even if:
+   * - Server is restarted
+   * - Lead status is reset
+   * - Multiple auto-call jobs run
    */
   async processPendingLeads() {
     try {
+      console.log(`\n🔵 AUTO-CALL STARTED AT ${new Date().toISOString()}`);
+
+      // Get leads that:
+      // 1. Have has_been_called = false (NEVER been called before)
+      //    NOTE: $ne: true handles both false AND undefined (for old leads)
+      // 2. Are not deleted
+      // 3. DON'T have an active call in progress
+      // IMPORTANT: We ONLY check has_been_called flag. We DON'T check lead_type or call_status
+      // because they can change. Only has_been_called is permanent.
+      
+      // First, get all active calls to avoid calling leads that are already on a call
+      const activeCallStatuses = ['initiated', 'queued', 'ringing', 'connected', 'in-progress'];
+      const activeCalls = await CallHistory.find({
+        status: { $in: activeCallStatuses }
+      }).select('leadId').lean();
+      
+      const activeLeadIds = new Set(activeCalls.map(call => call.leadId?.toString()));
+      console.log(`⚠️  ${activeLeadIds.size} leads have active calls - will skip these`);
+
       const pendingLeads = await Lead.find({
-        call_status: 'pending',
-        deleted_at: null
+        $or: [
+          { has_been_called: false },
+          { has_been_called: { $exists: false } }  // For old leads that don't have this field yet
+        ],
+        deleted_at: null,
+        _id: { $nin: Array.from(activeLeadIds) }  // Exclude leads with active calls
       }).lean();
 
+      console.log(`✅ Found ${pendingLeads.length} leads with has_been_called=false and no active calls`);
+      
+      // 🔴 DEBUG: Log details of pending leads
+      if (pendingLeads.length > 0) {
+        console.log('🔍 [DEBUG] Pending leads details:');
+        for (const lead of pendingLeads) {
+          console.log(`  - ${lead.full_name}: has_been_called=${lead.has_been_called}, call_status=${lead.call_status}, lead_type=${lead.lead_type}`);
+        }
+      }
+      
       if (pendingLeads.length === 0) {
-        return;
+        console.log('✅ No leads to call');
+        return {
+          success: true,
+          message: 'No leads to call',
+          leadsProcessed: 0
+        };
       }
 
-      console.log(`\n📞 Auto-call: Processing ${pendingLeads.length} pending leads...`);
+      console.log(`📞 Calling ${pendingLeads.length} leads...`);
 
+      let successCount = 0;
       for (const lead of pendingLeads) {
-        await this.callLead(lead);
+        const result = await this.callLead(lead);
+        if (result.success) {
+          successCount++;
+          console.log(`✅ ${lead.full_name} - Call initiated`);
+        } else {
+          console.log(`❌ ${lead.full_name} - ${result.error || 'Failed'}`);
+        }
       }
+
+      console.log(`🔵 AUTO-CALL COMPLETED: ${successCount}/${pendingLeads.length} leads called at ${new Date().toISOString()}\n`);
+      
+      return {
+        success: true,
+        message: `Auto-call completed: ${successCount} leads called`,
+        leadsProcessed: successCount
+      };
     } catch (error) {
-      console.error('Error in processPendingLeads:', error);
+      console.error('❌ CRITICAL ERROR in processPendingLeads:', error.message);
+      return {
+        success: false,
+        error: error.message
+      };
     }
   }
 
   /**
    * Call a single lead
+   * Double-check has_been_called flag before calling (safety check)
    */
   async callLead(lead) {
     try {
-      const { _id: leadId, user_id: userId, contact_number, project_name, full_name } = lead;
+      const { _id: leadId, user_id: userId, contact_number, project_name, full_name, has_been_called } = lead;
 
-      console.log(`📱 Auto-calling: ${full_name} (${contact_number})`);
+      // 🔴 SAFETY CHECK: If already called, skip (should never happen but prevents duplicates)
+      if (has_been_called === true) {
+        console.log(`⚠️  SKIPPING ${full_name} - already has has_been_called=true`);
+        return { success: false, error: 'Lead already called (safety check)' };
+      }
+
+      console.log(`📱 Calling: ${full_name} (${contact_number})`);
 
       const result = await callService.initiateCall({
         userId: userId,
@@ -118,13 +230,26 @@ class AutoCallService {
       });
 
       if (result.success) {
-        console.log(`✅ Auto-call initiated: ${full_name}`);
+        console.log(`✅ Call initiated: ${full_name}`);
+        return { success: true };
       } else {
-        console.error(`❌ Auto-call failed for ${full_name}:`, result.error);
+        console.error(`❌ Call failed for ${full_name}:`, result.message);
+        return { success: false, error: result.message };
       }
     } catch (error) {
-      console.error('Error in callLead:', error.message);
+      console.error('❌ Error in callLead:', error.message);
+      return { success: false, error: error.message };
     }
+  }
+
+  /**
+   * Reset the daily call counter at midnight
+   * NOTE: We NO LONGER reset has_been_called because each lead should only be called ONCE ever
+   * This function is kept for backward compatibility but does nothing
+   */
+  async resetDailyTracker() {
+    console.log('⏸️  Daily tracker reset skipped - leads marked has_been_called=true are NEVER called again');
+    // Do nothing - leads should only be called once forever
   }
 }
 

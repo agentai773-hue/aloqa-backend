@@ -25,14 +25,16 @@ class CallHistoryService {
         autoCallAttemptNumber: callData.autoCallAttemptNumber || 0,
       };
 
-      console.log('Creating CallHistory record with data:', JSON.stringify(recordData, null, 2));
+      console.log('📝 Creating CallHistory record with data:', JSON.stringify(recordData, null, 2));
 
       const historyRecord = await callHistoryRepository.create(recordData);
       
-      console.log('CallHistory record created successfully:', historyRecord._id);
+      console.log(`✅ CallHistory record created successfully - ID: ${historyRecord._id}`);
+      console.log('CallHistory data:', JSON.stringify(historyRecord.toObject ? historyRecord.toObject() : historyRecord, null, 2));
       return historyRecord;
     } catch (error) {
-      console.error('Error saving call history:', error);
+      console.error('❌ Error saving call history:', error);
+      console.error('Error stack:', error.stack);
       throw new Error(`Failed to save call history: ${error.message}`);
     }
   }

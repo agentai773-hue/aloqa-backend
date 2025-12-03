@@ -3,6 +3,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
+const http = require('http');
+const socketIO = require('socket.io');
 require('dotenv').config();
 
 // Import database connection
@@ -14,14 +16,36 @@ require('./models/Lead');
 // Import routes
 const routes = require('./routes');
 
-// Import call status polling service
-const callStatusPollingService = require('./clients/services/callStatusPollingService');
-
 // Import auto-call service
 const autoCallService = require('./clients/services/autoCallService');
 
+// Import cron jobs initializer
+const CronJobsInitializer = require('./config/cronJobsInitializer');
+
 const app = express();
+const server = http.createServer(app);
+const io = socketIO(server, {
+  cors: {
+    origin: [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://localhost:5173',
+      'http://127.0.0.1:5173',
+      'http://192.168.2.37:5173',
+      'http://192.168.3.103:3000',
+      'https://aloqa-admin-panel-frontend.vercel.app',
+      'https://aloqa-client-side-frontend.vercel.app',
+      process.env.CLIENT_URL,
+      process.env.CLIENT_URL1
+    ].filter(Boolean),
+    credentials: true
+  }
+});
+
 const PORT = process.env.PORT || 8080;
+
+// Make io accessible to routes and services
+app.locals.io = io;
 
 // Debug environment
 console.log('🚀 Starting server...');
@@ -87,6 +111,15 @@ if (process.env.NODE_ENV === 'development') {
 app.use(express.json({ limit: '10mb' })); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 
+// Debug middleware - log all webhook requests (AFTER body parser so req.body is populated)
+app.use((req, res, next) => {
+  if (req.path.includes('webhook') || req.path.includes('call-history')) {
+    console.log('\n🔔🔔🔔 REQUEST TO:', req.method, req.path);
+    console.log('📦 Body:', JSON.stringify(req.body, null, 2));
+  }
+  next();
+});
+
 // Routes
 app.get('/', (req, res) => {
   res.json({
@@ -125,28 +158,72 @@ app.use('*', (req, res) => {
   });
 });
 
+// WebSocket connection handling
+io.on('connection', (socket) => {
+  console.log(`\n✅ [WebSocket] New client connected: ${socket.id}`);
+  console.log(`📊 [WebSocket] Total connected clients: ${io.engine.clientsCount}`);
+
+  socket.on('join-user', (userId) => {
+    if (!userId) {
+      console.warn('⚠️  [WebSocket] join-user event received with no userId');
+      return;
+    }
+    console.log(`\n📍 [WebSocket] User joining room:`);
+    console.log(`   - userId: ${userId}`);
+    console.log(`   - socket.id: ${socket.id}`);
+    console.log(`   - Room: user:${userId}`);
+    
+    socket.join(`user:${userId}`);
+    
+    // Debug: Check if socket actually joined the room
+    const roomClients = io.sockets.adapter.rooms?.get(`user:${userId}`);
+    const clientCount = roomClients?.size || 0;
+    console.log(`✅ [WebSocket] User joined room - clients in room: ${clientCount}`);
+    
+    // Emit acknowledgement back to client
+    socket.emit('joined-user-room', { userId, roomName: `user:${userId}`, clientsInRoom: clientCount });
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`\n❌ [WebSocket] Client disconnected: ${socket.id}`);
+    console.log(`📊 [WebSocket] Total connected clients: ${io.engine.clientsCount}`);
+  });
+
+  socket.on('error', (error) => {
+    console.error(`\n❌ [WebSocket] Client error ${socket.id}:`, error);
+  });
+});
+
 // Start server
-app.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server is running on port ${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🌐 Access the server at: http://localhost:${PORT}`);
+  console.log(`🔌 WebSocket.io initialized`);
   
-  // Start auto-call service on server startup
+  // 🔴 AUTO-CALL IS NOW DISABLED ON STARTUP
+  // 🔴 START MANUALLY VIA: POST /api/client-call/start
+  // 🔴 STOP MANUALLY VIA: POST /api/client-call/stop
+  console.log(`\n🔴 AUTO-CALL SERVICE: DISABLED ON STARTUP (manual control only)`);
+  console.log(`🔴 START AUTO-CALL: POST /api/client-call/start`);
+  console.log(`🔴 STOP AUTO-CALL: POST /api/client-call/stop`);
+  console.log(`🔴 STATUS: GET /api/client-call/status\n`);
+  
+  // Initialize all cron jobs (safety check, lead type update, etc)
   setTimeout(() => {
-    console.log('🔄 Starting auto-call service...');
-    autoCallService.startAutoCall();
-  }, 2000); // Wait 2 seconds for DB to be ready
-  
-  // Start call status polling service
-  console.log('🔄 Initializing call status polling service...');
-  callStatusPollingService.startPolling();
+    console.log('⏰ Initializing all cron jobs...');
+    CronJobsInitializer.initializeCronJobs();
+  }, 3000); // Wait 3 seconds for DB to be ready
 });
 
 // Graceful shutdown
 process.on('SIGINT', () => {
   console.log('\n🛑 Shutting down server gracefully...');
-  callStatusPollingService.stopPolling();
-  process.exit(0);
+  autoCallService.stopAutoCall();
+  CronJobsInitializer.stopAllCronJobs();
+  server.close(() => {
+    process.exit(0);
+  });
 });
 
 module.exports = app;
