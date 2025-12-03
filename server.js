@@ -2,8 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
-const http = require('http');
-const socketIO = require('socket.io');
 require('dotenv').config();
 
 // Import database connection
@@ -16,28 +14,7 @@ const routes = require('./src/routes');
 const CronJobsInitializer = require('./src/config/cronJobsInitializer');
 
 const app = express();
-const server = http.createServer(app);
-const io = socketIO(server, {
-  cors: {
-    origin: [
-      'http://localhost:5173',
-      'http://127.0.0.1:5173',
-      'http://192.168.2.37:5173',
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-      'http://localhost:8080',
-      'http://localhost:8081',
-      process.env.CLIENT_URL,
-      process.env.CLIENT_URL1
-    ].filter(Boolean),
-    credentials: true
-  }
-});
-
 const PORT = process.env.PORT || 8080;
-
-// Make io accessible to routes and services
-app.locals.io = io;
 
 // Connect to MongoDB
 connectDB();
@@ -131,45 +108,17 @@ app.use('*', (req, res) => {
 });
 
 // Start server
-server.listen(PORT, () => {
+app.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🌐 Access the server at: http://localhost:${PORT}`);
-  console.log(`🔌 WebSocket.io initialized`);
-});
-
-// WebSocket connection handling
-io.on('connection', (socket) => {
-  console.log(`✅ WebSocket: New client connected ${socket.id}`);
-
-  socket.on('join-user', (userId) => {
-    if (!userId) {
-      console.warn('⚠️  WebSocket: join-user event received with no userId');
-      return;
-    }
-    socket.join(`user:${userId}`);
-    console.log(`✅ WebSocket: User ${userId} joined room user:${userId}`);
-    
-    // Emit acknowledgement back to client
-    socket.emit('joined-user-room', { userId, roomName: `user:${userId}` });
-  });
-
-  socket.on('disconnect', () => {
-    console.log(`❌ WebSocket: Client disconnected ${socket.id}`);
-  });
-
-  socket.on('error', (error) => {
-    console.error(`❌ WebSocket: Client error ${socket.id}:`, error);
-  });
 });
 
 // Graceful shutdown
 process.on('SIGINT', () => {
   console.log('\n🛑 Shutting down server gracefully...');
   CronJobsInitializer.stopAllCronJobs();
-  server.close(() => {
-    process.exit(0);
-  });
+  process.exit(0);
 });
 
 module.exports = app;

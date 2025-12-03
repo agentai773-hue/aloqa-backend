@@ -1,10 +1,9 @@
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
-const http = require('http');
-const socketIO = require('socket.io');
 require('dotenv').config();
 
 // Import database connection
@@ -22,30 +21,15 @@ const autoCallService = require('./clients/services/autoCallService');
 // Import cron jobs initializer
 const CronJobsInitializer = require('./config/cronJobsInitializer');
 
-const app = express();
-const server = http.createServer(app);
-const io = socketIO(server, {
-  cors: {
-    origin: [
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-      'http://localhost:5173',
-      'http://127.0.0.1:5173',
-      'http://192.168.2.37:5173',
-      'http://192.168.3.103:3000',
-      'https://aloqa-admin-panel-frontend.vercel.app',
-      'https://aloqa-client-side-frontend.vercel.app',
-      process.env.CLIENT_URL,
-      process.env.CLIENT_URL1
-    ].filter(Boolean),
-    credentials: true
-  }
-});
+// Import Socket.IO
+const { initializeSocketIO } = require('./clients/websocket/socketIO');
 
+const app = express();
+const httpServer = http.createServer(app);
 const PORT = process.env.PORT || 8080;
 
-// Make io accessible to routes and services
-app.locals.io = io;
+// Initialize Socket.IO
+const io = initializeSocketIO(httpServer);
 
 // Debug environment
 console.log('🚀 Starting server...');
@@ -158,48 +142,12 @@ app.use('*', (req, res) => {
   });
 });
 
-// WebSocket connection handling
-io.on('connection', (socket) => {
-  console.log(`\n✅ [WebSocket] New client connected: ${socket.id}`);
-  console.log(`📊 [WebSocket] Total connected clients: ${io.engine.clientsCount}`);
-
-  socket.on('join-user', (userId) => {
-    if (!userId) {
-      console.warn('⚠️  [WebSocket] join-user event received with no userId');
-      return;
-    }
-    console.log(`\n📍 [WebSocket] User joining room:`);
-    console.log(`   - userId: ${userId}`);
-    console.log(`   - socket.id: ${socket.id}`);
-    console.log(`   - Room: user:${userId}`);
-    
-    socket.join(`user:${userId}`);
-    
-    // Debug: Check if socket actually joined the room
-    const roomClients = io.sockets.adapter.rooms?.get(`user:${userId}`);
-    const clientCount = roomClients?.size || 0;
-    console.log(`✅ [WebSocket] User joined room - clients in room: ${clientCount}`);
-    
-    // Emit acknowledgement back to client
-    socket.emit('joined-user-room', { userId, roomName: `user:${userId}`, clientsInRoom: clientCount });
-  });
-
-  socket.on('disconnect', () => {
-    console.log(`\n❌ [WebSocket] Client disconnected: ${socket.id}`);
-    console.log(`📊 [WebSocket] Total connected clients: ${io.engine.clientsCount}`);
-  });
-
-  socket.on('error', (error) => {
-    console.error(`\n❌ [WebSocket] Client error ${socket.id}:`, error);
-  });
-});
-
 // Start server
-server.listen(PORT, '0.0.0.0', () => {
+httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server is running on port ${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🌐 Access the server at: http://localhost:${PORT}`);
-  console.log(`🔌 WebSocket.io initialized`);
+  console.log(`🔌 WebSocket available at ws://localhost:${PORT}`);
   
   // 🔴 AUTO-CALL IS NOW DISABLED ON STARTUP
   // 🔴 START MANUALLY VIA: POST /api/client-call/start
@@ -221,9 +169,7 @@ process.on('SIGINT', () => {
   console.log('\n🛑 Shutting down server gracefully...');
   autoCallService.stopAutoCall();
   CronJobsInitializer.stopAllCronJobs();
-  server.close(() => {
-    process.exit(0);
-  });
+  process.exit(0);
 });
 
-module.exports = app;
+module.exports = { app, io, httpServer };

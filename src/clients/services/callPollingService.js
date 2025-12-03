@@ -20,10 +20,17 @@ class CallPollingService {
   /**
    * Start polling a specific execution until it completes
    * Called after initiating a call to wait for completion
+   * Also emits WebSocket status updates during polling
+   * 
+   * NOTE: maxDuration defaults to 180000ms (3 minutes) because:
+   * - Most calls complete within 2-3 minutes
+   * - Bolna sometimes reports stale status for calls that user hung up
+   * - After 3 minutes, we trust that status is "connected" (call is ongoing)
+   * - Polling beyond this causes incorrect "busy" status to appear later
    */
-  async startPollingExecution(executionId, leadId, userId, maxDuration = 600000) {
+  async startPollingExecution(executionId, leadId, userId, maxDuration = 180000) {
     try {
-      console.log(`📊 Polling execution_id=${executionId} for lead_id=${leadId}`);
+      console.log(`📊 Polling execution_id=${executionId} for lead_id=${leadId} (max ${maxDuration}ms)`);
 
       const user = await User.findById(userId);
       if (!user || !user.bearerToken) {
@@ -33,7 +40,10 @@ class CallPollingService {
 
       const startTime = Date.now();
       let pollAttempt = 0;
-      const pollInterval = 3000; // 5 seconds
+      const pollInterval = 3000; // 3 seconds - check more frequently for real-time updates
+      let lastEmittedStatus = null; // Track last emitted status to avoid duplicates
+      
+      const webSocketService = require('../websocket/services/webSocketService');
 
       return new Promise((resolve) => {
         const pollTimer = setInterval(async () => {
@@ -42,8 +52,29 @@ class CallPollingService {
 
             // Check if max duration exceeded
             if (Date.now() - startTime > maxDuration) {
-              console.log(`⏱️  Max polling duration exceeded for execution ${executionId}`);
+              console.log(`⏱️  Max polling duration exceeded (${maxDuration}ms) for execution ${executionId}`);
+              console.log(`⏱️  Assuming call is complete - stopping polling and keeping current status as "connected"`);
               clearInterval(pollTimer);
+              
+              // Mark as called but keep status as "connected" (most accurate for long calls)
+              try {
+                const Lead = require('../../models/Lead');
+                await Lead.findByIdAndUpdate(
+                  leadId,
+                  {
+                    $set: {
+                      call_status: 'connected',  // Keep as connected (user likely still on call or just hung up)
+                      has_been_called: true,     // Mark as called
+                      last_auto_call_attempt: new Date()
+                    }
+                  },
+                  { new: true, runValidators: false }
+                );
+                console.log(`✅ Lead ${leadId} marked as called with final status: connected`);
+              } catch (updateError) {
+                console.error(`❌ Error updating lead after timeout:`, updateError.message);
+              }
+              
               resolve(false);
               return;
             }
@@ -63,8 +94,41 @@ class CallPollingService {
 
             console.log(`🔄 Polling execution ${executionId}: ${currentStatus}`);
 
-            // Check if completed
-            if (currentStatus === 'completed' || currentStatus === 'failed' || currentStatus === 'failed-invalid') {
+            // 🚀 EMIT STATUS UPDATES via WebSocket during polling
+            // This gives real-time updates to frontend even while call is in progress
+            if (currentStatus !== lastEmittedStatus) {
+              try {
+                // Map Bolna status to our status - PRESERVE ACTUAL STATUS
+                let ourStatus = currentStatus;
+                if (currentStatus === 'ringing' || currentStatus === 'in-progress') {
+                  ourStatus = 'connected';
+                } else if (currentStatus === 'completed' || currentStatus === 'failed') {
+                  ourStatus = 'completed';
+                } else if (currentStatus === 'busy') {
+                  ourStatus = 'busy'; // ✅ Keep "busy" as is - don't convert to connected
+                } else if (currentStatus === 'failed-invalid') {
+                  ourStatus = 'not_connected';
+                }
+                
+                webSocketService.emitCallStatusUpdate(
+                  userId.toString(),
+                  leadId.toString(),
+                  ourStatus,
+                  {
+                    executionId: executionId,
+                    bolnaStatus: currentStatus,
+                    timestamp: new Date().toISOString(),
+                  }
+                );
+                console.log(`📡 [WebSocket] Status update emitted during polling: ${ourStatus}`);
+                lastEmittedStatus = currentStatus;
+              } catch (wsError) {
+                console.warn('⚠️  [WebSocket] Error emitting status during polling:', wsError.message);
+              }
+            }
+
+            // Check if completed (including busy which is a final status)
+            if (currentStatus === 'completed' || currentStatus === 'failed' || currentStatus === 'failed-invalid' || currentStatus === 'busy') {
               console.log(`✅ Execution ${executionId} completed: ${currentStatus}`);
               clearInterval(pollTimer);
 
@@ -99,6 +163,8 @@ class CallPollingService {
       let ourCallStatus = 'completed';
       if (status === 'failed' || status === 'failed-invalid') {
         ourCallStatus = 'not_connected';
+      } else if (status === 'busy') {
+        ourCallStatus = 'busy'; // ✅ Keep busy status as is
       }
 
       console.log(`📊 Execution completed - Status: ${status}, Our Status: ${ourCallStatus}`);
@@ -134,11 +200,14 @@ class CallPollingService {
       }
 
       // Update lead status
+      // 🔴 IMPORTANT: Mark lead as called for ALL final statuses (completed, busy, not_connected, etc)
+      // So it won't be called again today - only next day when reset happens
       const lead = await Lead.findByIdAndUpdate(
         leadId,
         { 
           $set: { 
-            call_status: ourCallStatus === 'completed' ? 'completed' : 'not_connected',
+            call_status: ourCallStatus,
+            has_been_called: true,  // ✅ Mark as called regardless of final status
             last_call_attempt: new Date()
           } 
         },
@@ -146,36 +215,8 @@ class CallPollingService {
       );
 
       console.log(`✅ Lead ${leadId} status updated to "${ourCallStatus}"`);
+      console.log(`🔒 Lead marked as has_been_called=true (won't be called again until reset)`);
       console.log(`📌 Lead call_status is now: ${lead.call_status}`);
-
-      // Emit WebSocket event to notify frontend of status change
-      try {
-        const app = require('../../../app');
-        const io = app?.locals?.io;
-        
-        if (io && userId) {
-          const roomName = `user:${userId}`;
-          console.log(`📡 [Polling] Emitting WebSocket event to room: ${roomName}`);
-          console.log(`📡 [Polling] Event: call:status-updated | Status: ${ourCallStatus}`);
-          
-          // Get connected clients in the room for debugging
-          const socketsInRoom = io.sockets.adapter.rooms?.get(roomName)?.size || 0;
-          console.log(`📊 [Polling] Clients in room ${roomName}: ${socketsInRoom}`);
-          
-          io.to(roomName).emit('call:status-updated', {
-            callId: callHistory?._id,
-            status: ourCallStatus,
-            leadId: leadId.toString(),
-            leadType: lead?.lead_type,
-            timestamp: new Date()
-          });
-          console.log(`✅ [Polling] WebSocket event emitted successfully`);
-        } else {
-          console.warn(`⚠️  [Polling] Could not emit WebSocket - io:${!!io}, userId:${userId}`);
-        }
-      } catch (wsError) {
-        console.warn(`⚠️  [Polling] Error emitting WebSocket from polling service:`, wsError.message);
-      }
 
       return true;
     } catch (error) {

@@ -25,7 +25,9 @@ class CallStatusPollingService {
 
       // Find calls that are still "in_progress" but haven't been updated in 1+ hour
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-      const stalledCalls = await this.repository.findCalls({
+      
+      const CallHistory = require('../../models/CallHistory');
+      const stalledCalls = await CallHistory.find({
         status: { $in: ['in_progress', 'initiated'] },
         lastStatusCheck: { $lt: oneHourAgo },
       });
@@ -123,6 +125,46 @@ class CallStatusPollingService {
 
         if (updated) {
           console.log(`✅ Updated call ${executionId} - Status: ${newStatus}, Recording: ${callDetails.recordingUrl ? '✓' : '✗'}`);
+          
+          // 🚀 EMIT WEBSOCKET EVENT FOR REAL-TIME CALL STATUS UPDATE
+          try {
+            const webSocketService = require('../websocket/services/webSocketService');
+            
+            // Emit call status update
+            webSocketService.emitCallStatusUpdate(
+              call.userId.toString(),
+              call.leadId.toString(),
+              newStatus,
+              {
+                callId: call.callId,
+                duration: callDetails.duration,
+                recordingUrl: callDetails.recordingUrl,
+                timestamp: new Date().toISOString(),
+              }
+            );
+            console.log(`📡 [WebSocket] Call status update emitted via polling - ${newStatus}`);
+
+            // Map call status to lead status
+            let leadCallStatus = 'pending';
+            if (newStatus === 'connected' || newStatus === 'in-progress') {
+              leadCallStatus = 'connected';
+            } else if (newStatus === 'completed') {
+              leadCallStatus = 'completed';
+            } else if (newStatus === 'failed' || newStatus === 'cancelled') {
+              leadCallStatus = 'not_connected';
+            }
+
+            // Emit lead status changed event
+            webSocketService.emitLeadStatusChanged(
+              call.userId.toString(),
+              call.leadId.toString(),
+              { call_status: leadCallStatus },
+              `call_${leadCallStatus}`
+            );
+            console.log(`📡 [WebSocket] Lead status changed to "${leadCallStatus}" - emitted via polling`);
+          } catch (wsError) {
+            console.warn(`⚠️  [WebSocket] Error emitting polling events (non-blocking):`, wsError.message);
+          }
           
           // Update lead call status if call is completed
           if (newStatus === 'completed' && call.leadId) {

@@ -23,6 +23,9 @@ class CallService {
 
       console.log('📞 Initiating call with params:', { userId, leadId, isAutoCall });
 
+      // Import webSocketService for real-time updates
+      const webSocketService = require('../websocket/services/webSocketService');
+
       // 1. Get lead details
       const lead = await this.repository.getLeadByIdAndUser(leadId, userId);
       
@@ -36,6 +39,60 @@ class CallService {
       }
 
       console.log('✅ Lead found:', lead.full_name);
+
+      // 🔴 CHECK IF LEAD HAS ALREADY BEEN CALLED - Prevent duplicate calls (BEFORE atomic update)
+      if (lead.has_been_called === true) {
+        console.log(`⛔ Lead ${leadId} has already been called. Preventing duplicate call.`);
+        return {
+          success: false,
+          statusCode: 400,
+          message: `Lead "${lead.full_name}" has already been called. Each lead should only be called once.`,
+          data: {
+            leadId,
+            leadName: lead.full_name,
+            callStatus: lead.call_status,
+            hasBeenCalled: true
+          }
+        };
+      }
+
+      // 🔴 ATOMIC UPDATE: Set has_been_called=true BEFORE Bolna API call to prevent race conditions
+      // This ensures no two requests can simultaneously call the same lead
+      try {
+        const Lead = require('../../models/Lead');
+        const atomiclyUpdatedLead = await Lead.findByIdAndUpdate(
+          leadId,
+          {
+            $set: {
+              has_been_called: true,  // ← Set IMMEDIATELY before Bolna API call
+              last_auto_call_attempt: new Date()
+            }
+          },
+          { 
+            new: true,
+            runValidators: false
+          }
+        );
+
+        // Verify the update succeeded
+        if (!atomiclyUpdatedLead || !atomiclyUpdatedLead.has_been_called) {
+          console.error('❌ [ATOMIC] Failed to set has_been_called=true');
+          return {
+            success: false,
+            statusCode: 500,
+            message: 'Failed to acquire lead for calling'
+          };
+        }
+
+        console.log(`✅ [ATOMIC] Lead ${leadId} marked as has_been_called=true BEFORE Bolna API call`);
+      } catch (atomicError) {
+        console.error('❌ ERROR: Atomic update failed:', atomicError.message);
+        return {
+          success: false,
+          statusCode: 500,
+          message: 'Failed to acquire lead for calling'
+        };
+      }
 
       // 2. Check if lead has a project assigned
       if (!lead.project_name) {
@@ -147,39 +204,49 @@ class CallService {
         };
       }
 
-      console.log(`✅ Bolna API succeeded - NOW MARKING LEAD as has_been_called=true`);
+      console.log(`✅ Bolna API succeeded`);
 
-      // 🔴 IMMEDIATELY MARK LEAD AS CALLED after successful API call
-      // This is the ATOMIC operation that prevents duplicate calls
-      // We set multiple fields atomically in ONE operation
+      // 🚀 EMIT WEBSOCKET EVENTS FOR REAL-TIME UPDATES
       try {
-        const Lead = require('../../models/Lead');
-        const markedLead = await Lead.findByIdAndUpdate(
-          leadId, 
+        // Emit call started event
+        webSocketService.emitCallStarted(
+          userId.toString(),
+          leadId.toString(),
           {
-            $set: { 
-              has_been_called: true,           // ← PERMANENT FLAG: Once true, NEVER call again
-              call_status: 'connected',        // ← Set status immediately
-              last_auto_call_attempt: new Date()
-            }
-          }, 
-          { new: true, runValidators: false }
+            callId: bolnaResponse.callId,
+            leadName: lead.full_name,
+            phoneNumber: lead.contact_number,
+            timestamp: new Date().toISOString(),
+          }
         );
-        console.log(`✅ Lead ${leadId} marked: has_been_called=true, status=connected`);
-        console.log(`🔴 [CRITICAL] Verifying save - has_been_called value: ${markedLead.has_been_called}`);
+        console.log(`📡 [WebSocket] Call started event emitted for lead ${lead.full_name}`);
+
+        // Emit lead status changed event to update call_status to 'connected'
+        webSocketService.emitLeadStatusChanged(
+          userId.toString(),
+          leadId.toString(),
+          { call_status: 'connected' },
+          'call_started'
+        );
+        console.log(`📡 [WebSocket] Lead status changed to 'connected' for lead ${leadId}`);
+
+        // IMMEDIATELY emit another status update to ensure frontend gets it
+        await new Promise(resolve => setTimeout(resolve, 100)); // Small delay to ensure event queue
         
-        // Double-check by fetching fresh from DB
-        const verifyLead = await Lead.findById(leadId).select('has_been_called call_status');
-        console.log(`🔴 [VERIFICATION] Fresh fetch from DB - has_been_called: ${verifyLead.has_been_called}, call_status: ${verifyLead.call_status}`);
-      } catch (markError) {
-        console.error('❌ ERROR: Failed to mark lead - ABORTING call process', markError.message);
-        // This is CRITICAL - if we can't mark the lead, we must return error
-        // Otherwise the lead may be called again
-        return {
-          success: false,
-          statusCode: 500,
-          message: 'Failed to mark lead as called - call may have been initiated but not marked'
-        };
+        webSocketService.emitCallStatusUpdate(
+          userId.toString(),
+          leadId.toString(),
+          'connected',
+          {
+            leadName: lead.full_name,
+            phoneNumber: lead.contact_number,
+            timestamp: new Date().toISOString(),
+            message: 'Call connected and in progress'
+          }
+        );
+        console.log(`📡 [WebSocket] Additional status update emitted - connected`);
+      } catch (wsError) {
+        console.warn('⚠️  [WebSocket] Error emitting events (non-blocking):', wsError.message);
       }
 
       // 9. Save call history
@@ -219,53 +286,6 @@ class CallService {
           console.log(`✅ CallHistory created: ${historyRecord._id}`);
         } catch (historyError) {
           console.error('❌ Error saving call history:', historyError.message);
-        }
-
-        // ⚠️  NOTE: has_been_called and call_status already set above (atomically)
-        // We already did the update when marking the lead right after Bolna API success
-        // No need to update again here - prevents unnecessary database operations
-        
-        // Emit WebSocket event to notify frontend that call is connected
-        try {
-          const app = require('../../../app');
-          const io = app?.locals?.io;
-          
-          if (io && userId) {
-            const roomName = `user:${userId}`;
-            console.log(`\n🔴🔴🔴 [CallService] EMITTING WebSocket Event 🔴🔴🔴`);
-            console.log(`   - userId: ${userId}`);
-            console.log(`   - leadId: ${leadId}`);
-            console.log(`   - Room: ${roomName}`);
-            console.log(`   - Event: call:status-updated`);
-            console.log(`   - New Status: connected`);
-            console.log(`   - callId: ${historyRecord?._id}`);
-            
-            // Get connected clients in the room for debugging
-            const socketsInRoom = io.sockets.adapter.rooms?.get(roomName)?.size || 0;
-            console.log(`   - Total clients in room: ${socketsInRoom}`);
-            
-            if (socketsInRoom === 0) {
-              console.warn(`⚠️  ⚠️  ⚠️  WARNING: NO CLIENTS in room ${roomName} - Event will NOT be received!`);
-            }
-            
-            const eventData = {
-              callId: historyRecord?._id,
-              status: 'connected',
-              leadId: leadId.toString(),
-              leadType: lead.lead_type,
-              timestamp: new Date().toISOString()
-            };
-            
-            console.log(`   - Event Data:`, JSON.stringify(eventData, null, 2));
-            
-            io.to(roomName).emit('call:status-updated', eventData);
-            console.log(`✅ ✅ ✅ [CallService] WebSocket event EMITTED successfully\n`);
-          } else {
-            console.warn(`⚠️  [CallService] Could not emit WebSocket - io:${!!io}, userId:${userId}`);
-          }
-        } catch (wsError) {
-          console.error(`❌ ❌ ❌ [CallService] Error emitting WebSocket on call init:`, wsError.message);
-          console.error(wsError);
         }
         
         // Start background polling for call completion
@@ -490,6 +510,24 @@ class CallService {
           message: bolnaResponse.error || 'Failed to initiate call',
           details: bolnaResponse.details
         };
+      }
+
+      // 🚀 EMIT WEBSOCKET EVENTS FOR REAL-TIME UPDATES (Custom Call)
+      try {
+        const webSocketService = require('../websocket/services/webSocketService');
+        
+        // Emit custom call started event to user's room
+        webSocketService.emitToUser(userId.toString(), 'custom:call_started', {
+          customerName,
+          projectName,
+          phoneNumber: recipientPhoneNumber,
+          callId: bolnaResponse.callId,
+          executionId: bolnaResponse.executionId,
+          timestamp: new Date().toISOString(),
+        });
+        console.log(`📡 [WebSocket] Custom call started event emitted for ${customerName}`);
+      } catch (wsError) {
+        console.warn('⚠️  [WebSocket] Error emitting custom call event (non-blocking):', wsError.message);
       }
 
       // Save call history

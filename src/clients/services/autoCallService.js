@@ -9,6 +9,7 @@ const Lead = require('../../models/Lead');
 const CallHistory = require('../../models/CallHistory');
 const CallService = require('./callService');
 const ScheduledCallsService = require('./scheduledCallsService');
+const webSocketService = require('../websocket/services/webSocketService');
 const callService = new CallService();
 const scheduledCallsService = require('./scheduledCallsService');
 
@@ -17,6 +18,9 @@ class AutoCallService {
     this.isRunning = false;
     this.cronJob = null;
     this.scheduledCallsCron = null;
+    // CRITICAL: Lock to prevent concurrent calls to same lead (in-memory set)
+    this.leadsBeingCalled = new Set(); // Tracks which lead IDs are currently being called
+    this.callInProgress = false; // Flag to prevent concurrent auto-call runs
   }
 
   /**
@@ -126,10 +130,27 @@ class AutoCallService {
    * - Server is restarted
    * - Lead status is reset
    * - Multiple auto-call jobs run
+   * 
+   * LOCK MECHANISM: Prevents concurrent auto-call runs and concurrent calls to same lead
    */
   async processPendingLeads() {
     try {
-      console.log(`\n🔵 AUTO-CALL STARTED AT ${new Date().toISOString()}`);
+      console.log('\n\n████████████████████████████████████████');
+      console.log('🔵 AUTO-CALL CYCLE STARTED');
+      console.log('████████████████████████████████████████\n');
+
+      // 🔒 PREVENT CONCURRENT AUTO-CALL RUNS
+      if (this.callInProgress) {
+        console.log('⚠️  Auto-call already in progress. Skipping this run to prevent duplicates.');
+        return {
+          success: false,
+          message: 'Auto-call already in progress. Please wait for current run to complete.'
+        };
+      }
+
+      this.callInProgress = true;
+      console.log(`⏰ AUTO-CALL STARTED AT ${new Date().toISOString()}`);
+      console.log(`🔒 callInProgress lock = true`);
 
       // Get leads that:
       // 1. Have has_been_called = false (NEVER been called before)
@@ -191,13 +212,24 @@ class AutoCallService {
 
       console.log(`🔵 AUTO-CALL COMPLETED: ${successCount}/${pendingLeads.length} leads called at ${new Date().toISOString()}\n`);
       
-      return {
+      const finalResult = {
         success: true,
         message: `Auto-call completed: ${successCount} leads called`,
         leadsProcessed: successCount
       };
+
+      // 🔒 CLEAR LOCK WHEN DONE
+      this.callInProgress = false;
+      this.leadsBeingCalled.clear();
+      
+      return finalResult;
     } catch (error) {
       console.error('❌ CRITICAL ERROR in processPendingLeads:', error.message);
+      
+      // 🔒 CLEAR LOCK ON ERROR
+      this.callInProgress = false;
+      this.leadsBeingCalled.clear();
+      
       return {
         success: false,
         error: error.message
@@ -208,33 +240,81 @@ class AutoCallService {
   /**
    * Call a single lead
    * Double-check has_been_called flag before calling (safety check)
+   * Uses per-lead lock to prevent concurrent calls to same lead
    */
   async callLead(lead) {
     try {
       const { _id: leadId, user_id: userId, contact_number, project_name, full_name, has_been_called } = lead;
 
-      // 🔴 SAFETY CHECK: If already called, skip (should never happen but prevents duplicates)
-      if (has_been_called === true) {
-        console.log(`⚠️  SKIPPING ${full_name} - already has has_been_called=true`);
-        return { success: false, error: 'Lead already called (safety check)' };
+      // 🔒 PER-LEAD LOCK: Prevent concurrent calls to same lead
+      const leadIdStr = leadId.toString();
+      if (this.leadsBeingCalled.has(leadIdStr)) {
+        console.log(`🔒 SKIPPING ${full_name} - already being called (concurrent call prevention)`);
+        return { success: false, error: 'Lead is already being called' };
       }
 
-      console.log(`📱 Calling: ${full_name} (${contact_number})`);
+      // ADD TO LOCK
+      this.leadsBeingCalled.add(leadIdStr);
+      console.log(`🔒 LOCKED lead ${leadIdStr} for calling`);
 
-      const result = await callService.initiateCall({
-        userId: userId,
-        leadId: leadId,
-        contactNumber: contact_number,
-        projectName: project_name,
-        isAutoCall: true,
-      });
+      try {
+        // 🔴 SAFETY CHECK: If already called, skip (should never happen but prevents duplicates)
+        if (has_been_called === true) {
+          console.log(`⚠️  SKIPPING ${full_name} - already has has_been_called=true`);
+          return { success: false, error: 'Lead already called (safety check)' };
+        }
 
-      if (result.success) {
-        console.log(`✅ Call initiated: ${full_name}`);
-        return { success: true };
-      } else {
-        console.error(`❌ Call failed for ${full_name}:`, result.message);
-        return { success: false, error: result.message };
+        console.log(`📱 Calling: ${full_name} (${contact_number})`);
+
+        const result = await callService.initiateCall({
+          userId: userId,
+          leadId: leadId,
+          contactNumber: contact_number,
+          projectName: project_name,
+          isAutoCall: true,
+        });
+
+        if (result.success) {
+          console.log(`✅ Call initiated: ${full_name}`);
+
+          // Emit WebSocket event - Call Started
+          try {
+            webSocketService.emitCallStarted(
+              userId.toString(),
+              leadId.toString(),
+              {
+                callId: result.callId,
+                leadName: full_name,
+                phoneNumber: contact_number,
+                timestamp: new Date().toISOString(),
+              }
+            );
+            console.log(`📡 WebSocket event emitted - Call started for lead ${full_name}`);
+          } catch (wsError) {
+            console.warn('⚠️ Error emitting WebSocket event (non-blocking):', wsError.message);
+          }
+
+          // Also emit lead status changed event
+          try {
+            webSocketService.emitLeadStatusChanged(
+              userId.toString(),
+              leadId.toString(),
+              { call_status: 'connected' },
+              'call_started'
+            );
+          } catch (wsError) {
+            console.warn('⚠️ Error emitting lead status changed event:', wsError.message);
+          }
+
+          return { success: true };
+        } else {
+          console.error(`❌ Call failed for ${full_name}:`, result.message);
+          return { success: false, error: result.message };
+        }
+      } finally {
+        // 🔓 ALWAYS REMOVE LOCK, even if error occurs
+        this.leadsBeingCalled.delete(leadIdStr);
+        console.log(`🔓 UNLOCKED lead ${leadIdStr}`);
       }
     } catch (error) {
       console.error('❌ Error in callLead:', error.message);

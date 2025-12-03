@@ -72,7 +72,6 @@ class CallHistoryController {
   async handleCallWebhook(req, res) {
     try {
       const webhookData = req.body;
-      const io = req.app.locals.io;
 
       console.log('\n📍📍📍 WEBHOOK RECEIVED FROM BOLNA 📍📍📍');
       console.log('Full webhook payload:', JSON.stringify(webhookData, null, 2));
@@ -146,6 +145,35 @@ class CallHistoryController {
             );
             console.log(`✅ Lead ${updatedCall.leadId} call_status updated to: ${leadCallStatus}`);
             console.log(`✅ Updated Lead data:`, { _id: updatedLead._id, call_status: updatedLead.call_status });
+
+            // 🚀 EMIT WEBSOCKET EVENT FOR REAL-TIME STATUS UPDATE
+            try {
+              const webSocketService = require('../websocket/services/webSocketService');
+              
+              webSocketService.emitLeadStatusChanged(
+                updatedCall.userId.toString(),
+                updatedCall.leadId.toString(),
+                { call_status: leadCallStatus },
+                `call_${leadCallStatus}`
+              );
+              console.log(`📡 [WebSocket] Lead status changed to "${leadCallStatus}" - emitted via webhook`);
+
+              // Also emit call status update event
+              webSocketService.emitCallStatusUpdate(
+                updatedCall.userId.toString(),
+                updatedCall.leadId.toString(),
+                updatedCall.status,
+                {
+                  callId: updatedCall.callId,
+                  duration: updatedCall.callDuration,
+                  recordingUrl: updatedCall.recordingUrl,
+                  timestamp: new Date().toISOString(),
+                }
+              );
+              console.log(`📡 [WebSocket] Call status update emitted - ${updatedCall.status}`);
+            } catch (wsError) {
+              console.warn(`⚠️  [WebSocket] Error emitting events (non-blocking):`, wsError.message);
+            }
           } catch (error) {
             console.error(`❌ Could not update Lead call_status:`, error.message);
             console.error(`❌ Full error:`, error);
@@ -164,27 +192,7 @@ class CallHistoryController {
           }
         }
 
-        // Emit real-time update via WebSocket
-        if (io && updatedCall.userId) {
-          const roomName = `user:${updatedCall.userId}`;
-          console.log(`📡 [WebhookController] Emitting WebSocket event to room: ${roomName}`);
-          console.log(`📡 [WebhookController] Event: call:status-updated | Status: ${updatedCall.status}`);
-          
-          // Get connected clients in the room for debugging
-          const socketsInRoom = io.sockets.adapter.rooms?.get(roomName)?.size || 0;
-          console.log(`📊 [WebhookController] Clients in room ${roomName}: ${socketsInRoom}`);
-          
-          io.to(roomName).emit('call:status-updated', {
-            callId: updatedCall._id,
-            status: updatedCall.status,
-            leadId: updatedCall.leadId,
-            leadType: updatedCall.leadType,
-            timestamp: new Date()
-          });
-          console.log('✅ [WebhookController] WebSocket event emitted successfully');
-        } else {
-          console.warn(`⚠️  [WebhookController] Could not emit WebSocket event - io:${!!io}, userId:${updatedCall.userId}`);
-        }
+
       } else {
         console.warn(`❌ Could not find call to update - callId: ${callId}, executionId: ${executionId}`);
       }

@@ -20,7 +20,7 @@ const leadSchema = new mongoose.Schema(
     },
     call_status: {
       type: String,
-      enum: ['pending', 'connected', 'not_connected', 'callback', 'completed', 'scheduled'],
+      enum: ['pending', 'connected', 'not_connected', 'callback', 'completed', 'scheduled', 'busy'],
       default: 'pending',
     },
     lead_type: {
