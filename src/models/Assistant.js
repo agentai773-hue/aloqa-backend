@@ -158,6 +158,11 @@ const assistantSchema = new mongoose.Schema({
         type: String,
         default: 'Kajal'
       },
+      voice_id: {
+        type: String,
+        default: null,
+        comment: 'ElevenLabs voice ID for voice cloning (optional)'
+      },
       engine: {
         type: String,
         default: 'neural',
@@ -173,7 +178,8 @@ const assistantSchema = new mongoose.Schema({
       },
       model: {
         type: String,
-        default: null
+        default: null,
+        comment: 'ElevenLabs model (e.g., eleven_turbo_v2_5)'
       }
     },
     stream: {
@@ -354,6 +360,18 @@ const assistantSchema = new mongoose.Schema({
       max: 1
     }
   }],
+  
+  // Voice Assignment Fields (for user-assigned voices)
+  voiceId: {
+    type: String,
+    trim: true,
+    comment: 'Voice ID from user voice assignments (ElevenLabs voice ID)'
+  },
+  voiceName: {
+    type: String,
+    trim: true,
+    comment: 'Voice name from user voice assignments'
+  },
   
   // Status
   status: {

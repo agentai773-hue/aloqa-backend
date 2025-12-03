@@ -37,7 +37,6 @@ router.use('/verify-email', verifyEmailRoutes);
 // Authentication routes
 router.use('/admin/auth', authRoutes);
 
-
 // User management routes
 router.use('/users', userRoutes);
 
@@ -50,8 +49,8 @@ router.use('/phone-numbers', phoneNumberRoutes);
 // Voice management routes
 router.use('/voices', voiceRoutes);
 
-// Voice assignment routes
-router.use('/assign-user-voice', assignUserVoiceRoutes);
+// Voice assignment routes (admin)
+router.use('/admin/assign-user-voice', assignUserVoiceRoutes);
 
 // user routes
 
