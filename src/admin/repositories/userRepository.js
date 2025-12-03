@@ -1,10 +1,82 @@
 const User = require('../../models/User');
 
 class UserRepository {
-async findAll(filters = {}) {
-  const query = { ...filters };
-  return await User.find(query).select('-password -otp').sort({ createdAt: -1 });
-}
+  async findAll(filters = {}) {
+    const { page = 1, limit = 10, search, status, approval, ...otherFilters } = filters;
+    
+    // Build query object
+    const query = { ...otherFilters };
+    
+    // Add search functionality
+    if (search) {
+      const searchRegex = new RegExp(search, 'i');
+      query.$or = [
+        { firstName: searchRegex },
+        { lastName: searchRegex },
+        { email: searchRegex },
+        { mobile: searchRegex },
+        { companyName: searchRegex }
+      ];
+    }
+    
+    // Add status filter
+    if (status === 'verified') {
+      query.isActive = 1;
+    } else if (status === 'pending') {
+      query.isActive = 0;
+    }
+    
+    // Add approval filter
+    if (approval === 'approved') {
+      query.isApproval = 1;
+    } else if (approval === 'pending') {
+      query.isApproval = 0;
+    }
+    
+    // Calculate pagination
+    const skip = (page - 1) * limit;
+    
+    return await User.find(query)
+      .select('-password -otp')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+  }
+
+  async countUsers(filters = {}) {
+    const { search, status, approval, ...otherFilters } = filters;
+    
+    // Build query object
+    const query = { ...otherFilters };
+    
+    // Add search functionality
+    if (search) {
+      const searchRegex = new RegExp(search, 'i');
+      query.$or = [
+        { firstName: searchRegex },
+        { lastName: searchRegex },
+        { email: searchRegex },
+        { mobile: searchRegex },
+        { companyName: searchRegex }
+      ];
+    }
+    
+    // Add status filter
+    if (status === 'verified') {
+      query.isActive = 1;
+    } else if (status === 'pending') {
+      query.isActive = 0;
+    }
+    
+    // Add approval filter
+    if (approval === 'approved') {
+      query.isApproval = 1;
+    } else if (approval === 'pending') {
+      query.isApproval = 0;
+    }
+    
+    return await User.countDocuments(query);
+  }
 
 
   async findById(id) {
@@ -48,11 +120,6 @@ async findAll(filters = {}) {
   async delete(id) {
     // Actually delete from database instead of soft delete
     return await User.findByIdAndDelete(id);
-  }
-
-  async countUsers(filters = {}) {
-    const query = { isActive: true, ...filters };
-    return await User.countDocuments(query);
   }
 
   async updateLastLogin(id) {

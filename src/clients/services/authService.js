@@ -30,7 +30,6 @@ async function loginUser(email, password) {
     throw error;
   }
 
-  console.log("user",user)
     if (user.isActive !== 1) {
     
     const error = new Error('please check your emmail to verify your account');

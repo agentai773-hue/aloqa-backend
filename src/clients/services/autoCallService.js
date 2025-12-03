@@ -28,7 +28,6 @@ class AutoCallService {
    */
   startAutoCall() {
     if (this.isRunning) {
-      console.log('✅ Auto-call service already running');
       return {
         success: true,
         message: 'Auto-call service is already running',
@@ -97,7 +96,6 @@ class AutoCallService {
         this.resetCron = null;
       }
 
-      console.log('✋ Stopped auto-call service');
       return {
         success: true,
         message: 'Auto-call service stopped',

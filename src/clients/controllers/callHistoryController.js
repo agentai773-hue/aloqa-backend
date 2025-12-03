@@ -18,7 +18,6 @@ class CallHistoryController {
         filters.assistantId = assistantId;
       }
 
-      console.log('getCallHistory - Filters:', filters);
 
       const result = await callHistoryService.getUserCallHistory(
         userId,
@@ -309,7 +308,6 @@ class CallHistoryController {
         filters.assistantId = assistantId;
       }
 
-      console.log('Search parameters:', { searchTerm, page, pageSize, status, assistantId, filters });
 
       const result = await callHistoryService.searchCalls(
         userId,

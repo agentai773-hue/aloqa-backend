@@ -43,7 +43,6 @@ app.use(cors({
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      console.log('⚠️  CORS blocked origin:', origin);
       callback(null, true); // Allow in development - change to false in production
     }
   },

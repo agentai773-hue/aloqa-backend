@@ -206,7 +206,6 @@ class LeadController {
         filters.dateRange = dateRange;
       }
 
-      console.log('Search leads parameters:', { searchTerm, page, pageSize, leadType, callStatus, dateRange, filters });
 
       const result = await this.leadService.searchLeads(
         userId,

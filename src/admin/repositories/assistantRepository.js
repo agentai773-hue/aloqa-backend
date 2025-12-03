@@ -28,25 +28,76 @@ class AssistantRepository {
   }
 
   /**
-   * Find all assistants with filters
+   * Find all assistants with filters, search, and pagination
    */
   async findAll(filters = {}) {
-    const query = {};
+    const { page = 1, limit = 10, search, agentType, ...otherFilters } = filters;
+    
+    // Build query object
+    const query = { ...otherFilters };
 
-    if (filters.userId) {
-      query.userId = filters.userId;
-    }
-
-    if (filters.status) {
-      query.status = filters.status;
-    } else {
-      // Exclude deleted by default
+    // Exclude deleted by default unless explicitly included
+    if (!filters.status || filters.status !== 'deleted') {
       query.status = { $ne: 'deleted' };
     }
 
+    // Add search functionality
+    if (search) {
+      const searchRegex = new RegExp(search, 'i');
+      query.$or = [
+        { agentName: searchRegex },
+        { agentId: searchRegex },
+        { agentType: searchRegex },
+        { status: searchRegex }
+      ];
+    }
+
+    // Add agent type filter
+    if (agentType) {
+      query.agentType = agentType;
+    }
+
+    // Calculate pagination
+    const skip = (page - 1) * limit;
+
     return await Assistant.find(query)
       .populate('userId', 'firstName lastName email companyName')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+  }
+
+  /**
+   * Count assistants with filters and search
+   */
+  async countAssistants(filters = {}) {
+    const { page, limit, search, agentType, ...otherFilters } = filters;
+    
+    // Build query object
+    const query = { ...otherFilters };
+
+    // Exclude deleted by default unless explicitly included
+    if (!filters.status || filters.status !== 'deleted') {
+      query.status = { $ne: 'deleted' };
+    }
+
+    // Add search functionality
+    if (search) {
+      const searchRegex = new RegExp(search, 'i');
+      query.$or = [
+        { agentName: searchRegex },
+        { agentId: searchRegex },
+        { agentType: searchRegex },
+        { status: searchRegex }
+      ];
+    }
+
+    // Add agent type filter
+    if (agentType) {
+      query.agentType = agentType;
+    }
+
+    return await Assistant.countDocuments(query);
   }
 
   /**

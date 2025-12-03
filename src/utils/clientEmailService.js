@@ -137,7 +137,6 @@ This is an automated email. Please do not reply to this message.
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log('Forgot password OTP email sent:', info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('Error sending forgot password OTP email:', error);
@@ -204,7 +203,6 @@ const sendPasswordResetConfirmation = async (user) => {
     };
 
     await transporter.sendMail(mailOptions);
-    console.log('Password reset confirmation email sent to:', user.email);
   } catch (error) {
     console.error('Error sending password reset confirmation email:', error);
     // Don't throw error - confirmation email is not critical

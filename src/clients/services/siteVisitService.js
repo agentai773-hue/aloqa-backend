@@ -254,7 +254,6 @@ class SiteVisitService {
               }
               
               visitDate = targetDate;
-              console.log('✅ Found word-form date:', dayWord, month, '->', visitDate);
               break;
             }
           }
@@ -330,7 +329,6 @@ class SiteVisitService {
               const parsed = new Date(dateMatch[1], dateMatch[2] - 1, dateMatch[3]);
               if (!isNaN(parsed.getTime()) && parsed > new Date()) {
                 visitDate = parsed;
-                console.log('✅ Found numeric date:', dateMatch[0], '->', visitDate);
                 break;
               }
             } catch (e) {
@@ -442,7 +440,6 @@ class SiteVisitService {
             .split(' ')
             .map(word => word.charAt(0).toUpperCase() + word.slice(1))
             .join(' ');
-          console.log('✅ Found project keyword:', projectName);
           break;
         }
       }
@@ -458,7 +455,6 @@ class SiteVisitService {
         const addressMatch = transcriptText.match(pattern);
         if (addressMatch && addressMatch[1]) {
           address = addressMatch[1].trim().substring(0, 100);
-          console.log('✅ Found address:', address);
           break;
         }
       }
@@ -481,7 +477,6 @@ class SiteVisitService {
         return null;
       }
 
-      console.log('✅ Site visit info found - creating record');
       return {
         visitDate,
         visitTime: this.normalizeTime(visitTime),

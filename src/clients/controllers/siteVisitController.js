@@ -3,7 +3,6 @@ const siteVisitService = require('../services/siteVisitService');
 class SiteVisitController {
   async createSiteVisit(req, res) {
     try {
-      console.log('📍 Creating site visit...');
       const result = await siteVisitService.createSiteVisit(req.body);
       res.status(201).json(result);
     } catch (error) {

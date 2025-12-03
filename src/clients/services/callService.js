@@ -365,7 +365,6 @@ class CallService {
         }
 
         executionAttempts++;
-        console.log(`Execution fetch attempt ${executionAttempts}/${maxAttempts} for ${initialResponse.executionId}`);
       }
 
       // Step 3: Extract call details from execution
@@ -560,7 +559,6 @@ class CallService {
           }
         }
 
-        console.log('Saving call history (custom call) with data:', JSON.stringify(historyData, null, 2));
 
         await callHistoryService.saveCallHistory(historyData);
       } catch (historyError) {

@@ -183,7 +183,6 @@ class LeadRepository {
         }
       }
 
-      console.log('Search leads query:', JSON.stringify(query, null, 2));
 
       // Execute query
       const leads = await Lead.find(query)
@@ -193,7 +192,6 @@ class LeadRepository {
 
       const total = await Lead.countDocuments(query);
 
-      console.log(`Found ${leads.length} leads out of ${total} total matching records`);
 
       return {
         leads,

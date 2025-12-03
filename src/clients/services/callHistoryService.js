@@ -148,7 +148,6 @@ class CallHistoryService {
         webhookData: webhookData,
       };
 
-      console.log(`Updating call ${callId} with webhook data:`, JSON.stringify(updateData, null, 2));
 
       const updatedCall = await callHistoryRepository.updateByCallId(callId, updateData);
       console.log(`Call ${callId} updated successfully`);
@@ -209,8 +208,6 @@ class CallHistoryService {
 
         if (transcriptData) {
           try {
-            console.log('📍 Attempting to extract site visit from transcript...');
-            console.log('📄 Transcript to parse:', typeof transcriptData === 'string' ? transcriptData : JSON.stringify(transcriptData));
             
             const siteVisitResult = await siteVisitService.extractAndCreateSiteVisit(
               existingCall.leadId.toString(),
@@ -219,15 +216,12 @@ class CallHistoryService {
             );
 
             if (siteVisitResult.success) {
-              console.log('✅ Site visit created from transcript:', siteVisitResult.data);
             } else {
-              console.log('ℹ️ No site visit info in transcript:', siteVisitResult.message);
             }
           } catch (siteVisitError) {
             console.warn('⚠️ Error extracting site visit (non-blocking):', siteVisitError.message);
           }
         } else {
-          console.log('⚠️ No transcript found in webhook data');
         }
       }
 

@@ -11,7 +11,6 @@ class CallRepository {
    */
   async getLeadByIdAndUser(leadId, userId) {
     try {
-      console.log(`🔍 Looking for lead with id=${leadId}, user_id=${userId}`);
       
       let lead = await Lead.findOne({
         _id: leadId,
@@ -30,7 +29,7 @@ class CallRepository {
           console.warn(`⚠️ Lead with id ${leadId} doesn't exist`);
         }
       } else {
-        console.log(`✅ Lead found with proper user_id: ${lead.full_name}`);
+       console.warn(`Lead found with user_id match.`);
       }
       
       return lead;

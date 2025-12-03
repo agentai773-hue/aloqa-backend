@@ -61,7 +61,6 @@ app.use(cors({
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      console.log('⚠️  CORS origin:', origin, '- allowing for now');
       callback(null, true); // Allow in development
     }
   },
