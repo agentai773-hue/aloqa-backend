@@ -51,6 +51,26 @@ class AutoCallController {
       });
     }
   }
+
+  /**
+   * Manually trigger auto-call ONE TIME (for testing and manual control)
+   */
+  async processOnceNow(req, res) {
+    try {
+      const result = await autoCallService.processPendingLeads();
+      res.json({
+        success: true,
+        message: 'Auto-call process executed',
+        data: result
+      });
+    } catch (error) {
+      console.error('❌ Error in processOnceNow:', error.message);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
 }
 
 module.exports = new AutoCallController();

@@ -1,5 +1,6 @@
 const callHistoryRepository = require('../repositories/callHistoryRepository');
 const siteVisitService = require('./siteVisitService');
+const webSocketService = require('../websocket/services/webSocketService');
 
 class CallHistoryService {
   // Save initial call record when call is initiated
@@ -25,12 +26,16 @@ class CallHistoryService {
         autoCallAttemptNumber: callData.autoCallAttemptNumber || 0,
       };
 
+      console.log('📝 Creating CallHistory record with data:', JSON.stringify(recordData, null, 2));
 
       const historyRecord = await callHistoryRepository.create(recordData);
       
+      console.log(`✅ CallHistory record created successfully - ID: ${historyRecord._id}`);
+      console.log('CallHistory data:', JSON.stringify(historyRecord.toObject ? historyRecord.toObject() : historyRecord, null, 2));
       return historyRecord;
     } catch (error) {
-      console.error('Error saving call history:', error);
+      console.error('❌ Error saving call history:', error);
+      console.error('Error stack:', error.stack);
       throw new Error(`Failed to save call history: ${error.message}`);
     }
   }
@@ -145,11 +150,40 @@ class CallHistoryService {
 
 
       const updatedCall = await callHistoryRepository.updateByCallId(callId, updateData);
+      console.log(`Call ${callId} updated successfully`);
+
+      // Emit WebSocket event for real-time status update
+      if (existingCall.userId && existingCall.leadId) {
+        try {
+          webSocketService.emitCallStatusUpdate(
+            existingCall.userId.toString(),
+            existingCall.leadId.toString(),
+            updateData.status,
+            {
+              callId: updatedCall.callId,
+              callDuration: updateData.callDuration,
+              recordingUrl: updateData.recordingUrl,
+            }
+          );
+          console.log(`📡 WebSocket event emitted - Call status update for lead ${existingCall.leadId}`);
+        } catch (wsError) {
+          console.warn('⚠️ Error emitting WebSocket event (non-blocking):', wsError.message);
+        }
+      }
 
       // Update lead's lead_type to "hot" if call status is "completed"
       if (existingCall.leadId && updateData.status === 'completed') {
         try {
           await this.updateLeadType(existingCall.leadId, 'hot');
+          console.log(`Lead ${existingCall.leadId} lead_type updated to "hot"`);
+
+          // Emit WebSocket event for lead type update
+          webSocketService.emitLeadStatusChanged(
+            existingCall.userId.toString(),
+            existingCall.leadId.toString(),
+            { lead_type: 'hot', call_status: 'completed' },
+            'lead_type_updated'
+          );
         } catch (error) {
           console.warn(`⚠️ Error updating lead type (non-blocking):`, error.message);
         }

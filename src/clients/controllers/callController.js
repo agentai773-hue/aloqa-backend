@@ -23,8 +23,12 @@ class CallController {
         });
       }
 
-      // Call the service
-      const result = await this.callService.initiateCall(userId, leadId);
+      // Call the service with object (not positional args)
+      const result = await this.callService.initiateCall({
+        userId,
+        leadId,
+        isAutoCall: false
+      });
 
       return res.status(result.statusCode || 500).json(result);
     } catch (error) {

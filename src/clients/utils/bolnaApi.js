@@ -7,7 +7,8 @@
 const axios = require('axios');
 
 const BOLNA_API_URL = process.env.BOLNA_API_URL || 'https://api.bolna.ai';
-const REQUEST_TIMEOUT = parseInt(process.env.BOLNA_REQUEST_TIMEOUT || '10000', 10);
+const REQUEST_TIMEOUT = parseInt(process.env.BOLNA_REQUEST_TIMEOUT || '30000', 10); // Increased from 10s to 30s
+const MAX_RETRIES = parseInt(process.env.BOLNA_MAX_RETRIES || '3', 10);
 
 class BolnaApiService {
   constructor() {
@@ -18,6 +19,35 @@ class BolnaApiService {
         'Content-Type': 'application/json'
       }
     });
+  }
+
+  /**
+   * Retry helper for API calls with exponential backoff
+   */
+  async retryWithBackoff(operation, maxRetries = MAX_RETRIES) {
+    let lastError;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error;
+        
+        // Don't retry on server errors (4xx, 5xx)
+        if (error.response?.status) {
+          throw error;
+        }
+        
+        // Only retry on timeout or network errors
+        if (attempt < maxRetries) {
+          const delayMs = Math.pow(2, attempt - 1) * 1000; // Exponential backoff: 1s, 2s, 4s
+          console.log(`⚠️  Retry attempt ${attempt}/${maxRetries} after ${delayMs}ms for: ${error.message}`);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+      }
+    }
+    
+    throw lastError;
   }
 
   /**
@@ -71,6 +101,7 @@ class BolnaApiService {
   /**
    * Fetch execution details from Bolna
    * GET https://api.bolna.ai/executions/{execution_id}
+   * Uses retry logic for resilience
    */
   async fetchExecutionDetails(executionId, bearerToken) {
     try {
@@ -81,14 +112,16 @@ class BolnaApiService {
         };
       }
 
-      const response = await this.client.get(
-        `/executions/${executionId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${bearerToken}`
+      const response = await this.retryWithBackoff(async () => {
+        return await this.client.get(
+          `/executions/${executionId}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${bearerToken}`
+            }
           }
-        }
-      );
+        );
+      });
 
       if (response.status === 200) {
         console.log(`✅ [fetchExecutionDetails] Success for execution ${executionId}`);
@@ -115,6 +148,7 @@ class BolnaApiService {
    * Make initial call to Bolna API
    * POST https://api.bolna.ai/call
    * This returns execution_id (not call_id)
+   * Uses retry logic for resilience
    */
   async makeCallToBolna(payload, bearerToken) {
     try {
@@ -132,15 +166,18 @@ class BolnaApiService {
         };
       }
 
-      const response = await this.client.post(
-        '/call',
-        payload,
-        {
-          headers: {
-            'Authorization': `Bearer ${bearerToken}`
+      // Use retry logic with exponential backoff
+      const response = await this.retryWithBackoff(async () => {
+        return await this.client.post(
+          '/call',
+          payload,
+          {
+            headers: {
+              'Authorization': `Bearer ${bearerToken}`
+            }
           }
-        }
-      );
+        );
+      });
 
       if (response.status === 200 || response.status === 201) {
         // Bolna returns execution_id, run_id in the initial response

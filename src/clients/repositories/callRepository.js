@@ -151,6 +151,24 @@ class CallRepository {
       throw error;
     }
   }
+
+  /**
+   * Update lead call status
+   * Called when call is initiated to prevent duplicate calls
+   */
+  async updateLeadCallStatus(leadId, status) {
+    try {
+      const lead = await Lead.findByIdAndUpdate(
+        leadId,
+        { $set: { call_status: status } },
+        { new: true }
+      );
+      return lead;
+    } catch (error) {
+      console.error('Error updating lead call status:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = CallRepository;

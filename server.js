@@ -10,11 +10,17 @@ const connectDB = require('./src/config/database');
 // Import routes
 const routes = require('./src/routes');
 
+// Import cron jobs initializer
+const CronJobsInitializer = require('./src/config/cronJobsInitializer');
+
 const app = express();
 const PORT = process.env.PORT || 8080;
 
 // Connect to MongoDB
 connectDB();
+
+// Initialize cron jobs
+CronJobsInitializer.initializeCronJobs();
 
 // CORS configuration - MUST come before other middleware
 app.use(cors({
@@ -110,6 +116,7 @@ app.listen(PORT, () => {
 // Graceful shutdown
 process.on('SIGINT', () => {
   console.log('\n🛑 Shutting down server gracefully...');
+  CronJobsInitializer.stopAllCronJobs();
   process.exit(0);
 });
 

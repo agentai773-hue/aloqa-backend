@@ -1,11 +1,13 @@
 const express = require('express');
 const LeadController = require('../controllers/leadController');
 const LeadDashboardController = require('../controllers/leadDashboardController');
+const LeadTypeAutoUpdateController = require('../controllers/leadTypeAutoUpdateController');
 const clientAuthMiddleware = require('../../middleware/clientMiddleware');
 
 const router = express.Router();
 const leadController = new LeadController();
 const leadDashboardController = new LeadDashboardController();
+const leadTypeAutoUpdateController = new LeadTypeAutoUpdateController();
 
 /**
  * Get complete leads dashboard statistics (all counts + leads data)
@@ -21,6 +23,11 @@ router.get('/dashboard', clientAuthMiddleware, (req, res) =>
  */
 router.post('/dashboard/filtered', clientAuthMiddleware, (req, res) =>
   leadDashboardController.getLeadsWithFilters(req, res)
+);
+
+// Get available projects
+router.get('/projects/list', (req, res) =>
+  leadController.getProjects(req, res)
 );
 
 // Check if lead exists by contact number
@@ -61,6 +68,25 @@ router.post('/import/csv', clientAuthMiddleware, (req, res) =>
 // Search leads with filters
 router.post('/search', clientAuthMiddleware, (req, res) =>
   leadController.searchLeads(req, res)
+);
+
+/**
+ * Auto-Update Lead Type Routes
+ */
+
+// Trigger daily auto-update manually
+router.put('/auto-update/trigger', clientAuthMiddleware, (req, res) =>
+  leadTypeAutoUpdateController.triggerDailyUpdate(req, res)
+);
+
+// Get auto-update stats
+router.get('/auto-update/stats', (req, res) =>
+  leadTypeAutoUpdateController.getStats(req, res)
+);
+
+// Confirm site visit and update lead to hot
+router.put('/site-visit/confirm/:siteVisitId', clientAuthMiddleware, (req, res) =>
+  leadTypeAutoUpdateController.confirmSiteVisit(req, res)
 );
 
 module.exports = router;

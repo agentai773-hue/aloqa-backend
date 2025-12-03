@@ -164,7 +164,48 @@ class SiteVisitService {
         }
       }
 
-   
+      console.log('📄 Parsing transcript for site visit info');
+      console.log('📝 Transcript text:', transcriptText.substring(0, 300) + '...');
+
+      // ============ FIRST CHECK: SITE VISIT KEYWORDS ============
+      // Only proceed if user mentioned visiting/site visit/viewing property
+      const visitKeywords = [
+        'visit',
+        'site visit',
+        'site check',
+        'dekhne',
+        'dekh',
+        'dekho',
+        'sample flat',
+        'showroom',
+        'come',
+        'आना',
+        'आओ',
+        'देखना',
+        'देख',
+        'देखो',
+        'आईये',
+        'मिलना',
+        'मिल',
+        'meeting',
+        'appointment',
+        'schedule',
+        'book',
+        'confirm',
+        'yes visit',
+        'definitely visit',
+        'sure visit',
+      ];
+
+      const transcriptLower = transcriptText.toLowerCase();
+      const hasVisitMention = visitKeywords.some(keyword => transcriptLower.includes(keyword));
+
+      if (!hasVisitMention) {
+        console.log('⚠️  No site visit keywords found in transcript - skipping site visit extraction');
+        return null;
+      }
+
+      console.log('✅ Site visit keywords found - attempting to extract date and time');
 
       let visitDate = null;
       let visitTime = null;
@@ -219,24 +260,55 @@ class SiteVisitService {
         }
       }
 
-      // 2. Look for day names (e.g., "Friday")
+      // 2. Look for day names (e.g., "Friday", "Thursday")
       if (!visitDate) {
+        const englishDays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
         const dayNames = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
                          'सोमवार', 'मंगलवार', 'बुधवार', 'गुरुवार', 'शुक्रवार', 'शनिवार', 'रविवार'];
         
+        const hindiToEnglish = {
+          'सोमवार': 'monday', 'मंगलवार': 'tuesday', 'बुधवार': 'wednesday', 'गुरुवार': 'thursday',
+          'शुक्रवार': 'friday', 'शनिवार': 'saturday', 'रविवार': 'sunday'
+        };
+        
+        const transcriptLowerForDayMatch = transcriptText.toLowerCase();
+        console.log('🔍 Looking for day names in transcript:', transcriptLowerForDayMatch.substring(0, 200));
+        
         for (const day of dayNames) {
-          if (transcriptText.toLowerCase().includes(day.toLowerCase())) {
-            const englishDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-            const dayIndex = englishDays.indexOf(day.toLowerCase());
+          const dayLower = day.toLowerCase();
+          if (transcriptLowerForDayMatch.includes(dayLower)) {
+            console.log('   ✅ Found day keyword:', dayLower);
+            
+            // Map to English day name
+            let englishDay = dayLower;
+            if (hindiToEnglish[dayLower]) {
+              englishDay = hindiToEnglish[dayLower];
+            }
+            
+            const dayIndex = englishDays.indexOf(englishDay);
+            console.log('   Day index in array:', dayIndex, '(englishDay=' + englishDay + ')');
             
             if (dayIndex !== -1) {
               const today = new Date();
               const currentDayIndex = today.getDay();
+              console.log('   Today is index:', currentDayIndex, '(0=Sun, 1=Mon, etc)');
+              
               let daysToAdd = dayIndex - currentDayIndex;
-              if (daysToAdd <= 0) daysToAdd += 7; // Next week if day already passed
+              console.log('   Initial daysToAdd:', daysToAdd);
+              
+              // If day is in the past or today, get next week's occurrence
+              if (daysToAdd < 0) {
+                daysToAdd += 7;
+              } else if (daysToAdd === 0) {
+                // If it's today, schedule for next week (7 days later)
+                daysToAdd = 7;
+              }
+              
+              console.log('   Final daysToAdd:', daysToAdd);
               
               visitDate = new Date(today);
               visitDate.setDate(visitDate.getDate() + daysToAdd);
+              console.log('✅ Found day name:', day, '-> Next occurrence:', visitDate.toDateString());
               break;
             }
           }
@@ -267,57 +339,93 @@ class SiteVisitService {
       }
 
       // ============ EXTRACT TIME ============
-      // 1. Try word-form times first (e.g., "two pm", "five pm")
-      const timeWordMap = {
-        'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5, 'six': 6, 'seven': 7,
-        'eight': 8, 'nine': 9, 'ten': 10, 'eleven': 11, 'twelve': 12
-      };
-
-      for (const [word, hour] of Object.entries(timeWordMap)) {
-        const wordTimeRegex = new RegExp(`${word}\\s*(?:PM|pm|AM|am|o'clock)?`, 'i');
-        if (wordTimeRegex.test(transcriptText)) {
-          // Check if PM is mentioned nearby
-          const context = transcriptText.toLowerCase();
-          const wordIndex = context.indexOf(word);
-          const nearbyText = context.substring(Math.max(0, wordIndex - 20), wordIndex + 20);
-          
-          if (nearbyText.includes('pm')) {
-            visitTime = `${String(hour + 12).padStart(2, '0')}:00`; // Convert to 24-hour
-            break;
-          } else if (nearbyText.includes('am') || word === 'one' || word === 'two') {
-            visitTime = `${String(hour).padStart(2, '0')}:00`;
-            break;
-          }
-        }
-      }
-
-      // 2. Try numeric times (e.g., "2 PM", "14:00")
+      console.log('\n🕐 TIME EXTRACTION DEBUG:');
+      console.log('Looking for time patterns in transcript...');
+      
+      // 1. Try numeric times FIRST with explicit PM/AM (e.g., "4 PM", "2:30 AM")
       if (!visitTime) {
-        const timePatterns = [
-          /(\d{1,2})\s*(?:PM|pm)\b/,                    // "2 PM"
-          /(\d{1,2})\s*(?:AM|am)\b/,                    // "2 AM"
-          /(\d{1,2}):(\d{2})\s*(?:AM|PM|am|pm)?/,       // "14:00" or "2:00 PM"
-          /(?:at|@)\s*(\d{1,2}):(\d{2})/,               // "at 14:00"
+        const numericTimePatterns = [
+          /(\d{1,2}):(\d{2})\s*(?:PM|pm)/,              // "14:30 PM" or "2:30 PM"
+          /(\d{1,2}):(\d{2})\s*(?:AM|am)/,              // "9:30 AM"
+          /(\d{1,2})\s+(?:PM|pm)\b/,                    // "4 PM" (space before PM)
+          /(\d{1,2})(?:PM|pm)\b/,                       // "4PM" (no space before PM)
+          /(\d{1,2})\s+(?:AM|am)\b/,                    // "9 AM"
+          /(\d{1,2})(?:AM|am)\b/,                       // "9AM"
         ];
 
-        for (const pattern of timePatterns) {
+        for (const pattern of numericTimePatterns) {
           const timeMatch = transcriptText.match(pattern);
           if (timeMatch) {
             let hour = parseInt(timeMatch[1]);
             let minutes = timeMatch[2] ? parseInt(timeMatch[2]) : 0;
             
             // Check if PM mentioned
-            const fullMatch = timeMatch[0];
-            if (fullMatch.includes('PM') || fullMatch.includes('pm')) {
-              if (hour < 12) hour += 12;
-            } else if (fullMatch.includes('AM') || fullMatch.includes('am')) {
+            const fullMatch = timeMatch[0].toLowerCase();
+            if (fullMatch.includes('pm')) {
+              if (hour < 12 && hour !== 12) hour += 12;
+            } else if (fullMatch.includes('am')) {
               if (hour === 12) hour = 0;
             }
             
             visitTime = `${String(hour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+            console.log('   ✅ MATCHED numeric pattern:', timeMatch[0], '-> Time:', visitTime);
             break;
+          } else {
+            console.log('   ⚠️  Pattern did not match:', pattern.toString());
           }
         }
+      }
+
+      // 2. Try word-form times with PM/AM (e.g., "four pm", "two am")
+      // This needs to be MORE SPECIFIC to match the EXACT time in transcript
+      if (!visitTime) {
+        console.log('\n   Trying word-form times...');
+        const timeWordMap = {
+          'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5, 'six': 6, 'seven': 7,
+          'eight': 8, 'nine': 9, 'ten': 10, 'eleven': 11, 'twelve': 12
+        };
+
+        // Create a single regex that captures both the word AND the period
+        // This prevents matching "two" when the text says "three"
+        // Matches patterns like: "three pm", "3 pm", "three PM", "teen bajey"
+        const timePattern = /\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24)\s*(?:pm|p\.m|PM|P\.M|am|a\.m|AM|A\.M)/gi;
+        
+        let match;
+        let allMatches = [];
+        while ((match = timePattern.exec(transcriptText)) !== null) {
+          allMatches.push({
+            matched: match[0],
+            hour: isNaN(match[1]) ? timeWordMap[match[1].toLowerCase()] || null : parseInt(match[1]),
+            period: match[0].toLowerCase().includes('am') || match[0].toLowerCase().includes('a.m') ? 'AM' : 'PM',
+            index: match.index
+          });
+        }
+
+        // If we found matches, use the FIRST (most likely) one
+        if (allMatches.length > 0) {
+          const firstMatch = allMatches[0];
+          let hour = firstMatch.hour;
+          
+          if (hour === null) {
+            console.log('   ⚠️  Could not parse hour from match:', firstMatch.matched);
+          } else {
+            // Convert to 24-hour format
+            if (firstMatch.period === 'PM' && hour !== 12) {
+              hour += 12;
+            } else if (firstMatch.period === 'AM' && hour === 12) {
+              hour = 0;
+            }
+            
+            visitTime = `${String(hour).padStart(2, '0')}:00`;
+            console.log('   ✅ MATCHED word-form time pattern:', firstMatch.matched, '-> Hour:', hour, '-> Time:', visitTime);
+          }
+        }
+      }
+
+      if (visitTime) {
+        console.log('\n🕐 Final extracted time:', visitTime);
+      } else {
+        console.log('\n❌ NO TIME EXTRACTED - Will fail site visit creation');
       }
 
       // ============ EXTRACT PROJECT NAME ============
@@ -352,16 +460,21 @@ class SiteVisitService {
       }
 
       // ============ VALIDATE AND RETURN ============
-      // Need at least time + project, date is optional (will default to tomorrow)
-      if (!visitTime || !projectName) {
-     
+      // Must have: time + projectName + date
+      // Without these, we cannot create a valid site visit
+      if (!visitDate) {
+        console.log('❌ No valid date extracted from transcript - skipping site visit creation');
         return null;
       }
 
-      // Smart defaults for missing data
-      if (!visitDate) {
-        visitDate = new Date();
-        visitDate.setDate(visitDate.getDate() + 1); // Default to tomorrow
+      if (!visitTime) {
+        console.log('❌ No valid time extracted from transcript - skipping site visit creation');
+        return null;
+      }
+
+      if (!projectName) {
+        console.log('❌ No project name found in transcript - skipping site visit creation');
+        return null;
       }
 
       return {

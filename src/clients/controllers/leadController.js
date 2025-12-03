@@ -1,4 +1,5 @@
 const LeadService = require('../services/leadService');
+const { PROJECTS } = require('../../data/projects');
 
 class LeadController {
   constructor() {
@@ -173,7 +174,21 @@ class LeadController {
     }
   }
 
-  // Search leads with filters
+  // Get available projects
+  async getProjects(req, res) {
+    try {
+      return res.status(200).json({
+        success: true,
+        data: PROJECTS,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
   async searchLeads(req, res) {
     try {
       const userId = req.user._id;

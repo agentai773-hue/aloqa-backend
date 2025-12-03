@@ -1,4 +1,5 @@
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -14,16 +15,26 @@ require('./models/Lead');
 // Import routes
 const routes = require('./routes');
 
-// Import call status polling service
-const callStatusPollingService = require('./clients/services/callStatusPollingService');
-
 // Import auto-call service
 const autoCallService = require('./clients/services/autoCallService');
 
+// Import cron jobs initializer
+const CronJobsInitializer = require('./config/cronJobsInitializer');
+
+// Import Socket.IO
+const { initializeSocketIO } = require('./clients/websocket/socketIO');
+
 const app = express();
+const httpServer = http.createServer(app);
 const PORT = process.env.PORT || 8080;
 
+// Initialize Socket.IO
+const io = initializeSocketIO(httpServer);
 
+// Debug environment
+console.log('🚀 Starting server...');
+console.log('📍 NODE_ENV:', process.env.NODE_ENV || 'development');
+console.log('🔗 PORT:', PORT);
 
 // Connect to MongoDB
 connectDB();
@@ -83,6 +94,15 @@ if (process.env.NODE_ENV === 'development') {
 app.use(express.json({ limit: '10mb' })); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 
+// Debug middleware - log all webhook requests (AFTER body parser so req.body is populated)
+app.use((req, res, next) => {
+  if (req.path.includes('webhook') || req.path.includes('call-history')) {
+    console.log('\n🔔🔔🔔 REQUEST TO:', req.method, req.path);
+    console.log('📦 Body:', JSON.stringify(req.body, null, 2));
+  }
+  next();
+});
+
 // Routes
 app.get('/', (req, res) => {
   res.json({
@@ -122,27 +142,33 @@ app.use('*', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, '0.0.0.0', () => {
+httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server is running on port ${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🌐 Access the server at: http://localhost:${PORT}`);
+  console.log(`🔌 WebSocket available at ws://localhost:${PORT}`);
   
-  // Start auto-call service on server startup
+  // 🔴 AUTO-CALL IS NOW DISABLED ON STARTUP
+  // 🔴 START MANUALLY VIA: POST /api/client-call/start
+  // 🔴 STOP MANUALLY VIA: POST /api/client-call/stop
+  console.log(`\n🔴 AUTO-CALL SERVICE: DISABLED ON STARTUP (manual control only)`);
+  console.log(`🔴 START AUTO-CALL: POST /api/client-call/start`);
+  console.log(`🔴 STOP AUTO-CALL: POST /api/client-call/stop`);
+  console.log(`🔴 STATUS: GET /api/client-call/status\n`);
+  
+  // Initialize all cron jobs (safety check, lead type update, etc)
   setTimeout(() => {
-    console.log('🔄 Starting auto-call service...');
-    autoCallService.startAutoCall();
-  }, 2000); // Wait 2 seconds for DB to be ready
-  
-  // Start call status polling service
-  console.log('🔄 Initializing call status polling service...');
-  callStatusPollingService.startPolling();
+    console.log('⏰ Initializing all cron jobs...');
+    CronJobsInitializer.initializeCronJobs();
+  }, 3000); // Wait 3 seconds for DB to be ready
 });
 
 // Graceful shutdown
 process.on('SIGINT', () => {
   console.log('\n🛑 Shutting down server gracefully...');
-  callStatusPollingService.stopPolling();
+  autoCallService.stopAutoCall();
+  CronJobsInitializer.stopAllCronJobs();
   process.exit(0);
 });
 
-module.exports = app;
+module.exports = { app, io, httpServer };

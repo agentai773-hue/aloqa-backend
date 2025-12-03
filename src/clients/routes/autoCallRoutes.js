@@ -8,4 +8,7 @@ router.post('/start', clientAuthMiddleware, autoCallController.startAutoCallServ
 router.post('/stop', clientAuthMiddleware, autoCallController.stopAutoCallService);
 router.get('/status', clientAuthMiddleware, autoCallController.getAutoCallServiceStatus);
 
+// 🔴 NEW: Manually process pending leads ONE TIME (for testing and debugging)
+router.post('/process-now', clientAuthMiddleware, autoCallController.processOnceNow);
+
 module.exports = router;
