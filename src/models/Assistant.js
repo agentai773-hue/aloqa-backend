@@ -23,8 +23,8 @@ const assistantSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Agent type is required'],
     enum: [
-      'conversation', 
-      'webhook', 
+      'conversation',
+      'webhook',
       'other',
       'recruitment',
       'customer_support',
@@ -52,7 +52,7 @@ const assistantSchema = new mongoose.Schema({
     trim: true,
     default: null
   },
-  
+
   // LLM Configuration
   llmConfig: {
     agent_flow_type: {
@@ -75,7 +75,7 @@ const assistantSchema = new mongoose.Schema({
       enum: [
         // OpenAI models
         'gpt-4.1',
-        'gpt-4.1-nano', 
+        'gpt-4.1-nano',
         'gpt-4.1-mini',
         'gpt-4o',
         'gpt-4o-mini',
@@ -145,7 +145,7 @@ const assistantSchema = new mongoose.Schema({
       default: true
     }
   },
-  
+
   // Synthesizer Configuration (Text-to-Speech)
   synthesizerConfig: {
     provider: {
@@ -170,7 +170,7 @@ const assistantSchema = new mongoose.Schema({
       },
       sampling_rate: {
         type: String,
-        default: '8000'
+        default: '16000'
       },
       language: {
         type: String,
@@ -179,8 +179,53 @@ const assistantSchema = new mongoose.Schema({
       model: {
         type: String,
         default: null,
-        comment: 'ElevenLabs model (e.g., eleven_turbo_v2_5)'
+        comment: 'ElevenLabs model (e.g., eleven_turbo_v2_5,eleven_multilingual_v2)'
+      },
+      stability: {
+        type: Number,
+        default: 90,
+        min: 0,
+        max: 100
+      }, similarity_boost: {
+        type: Number,
+        default: 84,
+        min: 0,
+        max: 100
+      },
+      speed: {
+        type: Number,
+        default: 98,
+        min: 0,
+        max: 100
+      },
+      emotion: {
+        type: String,
+        default: 'friendly'
+      },
+      emotion_strength: {
+        type: Number,
+        default: 45,
+        min: 0,
+        max: 100
+      },
+      voice_pause_model: {
+        type: String,
+        default: 'minimal'
+      },
+      auto_punctuation_pause: {
+        type: Boolean,
+        default: false
+      },
+      dynamic_emotion_adaptation: {
+        type: Boolean,
+        default: true
+      },
+      use_speaker_boost: {
+        type: Boolean,
+        default: true
       }
+
+
     },
     stream: {
       type: Boolean,
@@ -196,7 +241,7 @@ const assistantSchema = new mongoose.Schema({
       enum: ['wav', 'mp3']
     }
   },
-  
+
   // Transcriber Configuration (Speech-to-Text)
   transcriberConfig: {
     provider: {
@@ -226,6 +271,18 @@ const assistantSchema = new mongoose.Schema({
       type: String,
       default: 'linear16'
     },
+    interim_results: {
+      type: Boolean,
+      default: true
+    },
+    punctuate: {
+      type: Boolean,
+      default: true
+    },
+    smart_format: {
+      type: Boolean,
+      default: true
+    },
     endpointing: {
       type: Number,
       default: 250,
@@ -233,7 +290,7 @@ const assistantSchema = new mongoose.Schema({
       max: 1000
     }
   },
-  
+
   // Input/Output Configuration
   inputConfig: {
     provider: {
@@ -259,7 +316,7 @@ const assistantSchema = new mongoose.Schema({
       enum: ['wav', 'mp3']
     }
   },
-  
+
   // Task Configuration
   taskConfig: {
     hangup_after_silence: {
@@ -304,17 +361,14 @@ const assistantSchema = new mongoose.Schema({
       type: String,
       default: null
     },
-    backchanneling_message_gap: {
-      type: Number,
-      default: 5
+    optimize_latency: {
+      type: Boolean,
+      default: true
     },
-    backchanneling_start_delay: {
-      type: Number,
-      default: 5
-    },
+
     ambient_noise_track: {
       type: String,
-      default: 'office-ambience'
+      default: 'none'
     },
     voicemail: {
       type: Boolean,
@@ -332,14 +386,14 @@ const assistantSchema = new mongoose.Schema({
       default: false
     }
   },
-  
+
   // System Prompt
   systemPrompt: {
     type: String,
     required: [true, 'System prompt is required'],
     trim: true
   },
-  
+
   // Routes for routing agent
   routes: [{
     routeName: {
@@ -360,7 +414,7 @@ const assistantSchema = new mongoose.Schema({
       max: 1
     }
   }],
-  
+
   // Voice Assignment Fields (for user-assigned voices)
   voiceId: {
     type: String,
@@ -372,20 +426,20 @@ const assistantSchema = new mongoose.Schema({
     trim: true,
     comment: 'Voice name from user voice assignments'
   },
-  
+
   // Status
   status: {
     type: String,
     enum: ['draft', 'active', 'inactive', 'deleted'],
     default: 'draft'
   },
-  
+
   // Bolna API Response
   bolnaResponse: {
     type: mongoose.Schema.Types.Mixed,
     default: null
   },
-  
+
   // Metadata
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
@@ -400,7 +454,7 @@ const assistantSchema = new mongoose.Schema({
   timestamps: true,
   toJSON: {
     virtuals: true,
-    transform: function(doc, ret) {
+    transform: function (doc, ret) {
       delete ret.__v;
       return ret;
     }
@@ -422,14 +476,14 @@ assistantSchema.virtual('userDetails', {
 });
 
 // Static method to find by user
-assistantSchema.statics.findByUser = function(userId) {
+assistantSchema.statics.findByUser = function (userId) {
   return this.find({ userId, status: { $ne: 'deleted' } })
     .populate('userId', 'firstName lastName email bearerToken')
     .sort({ createdAt: -1 });
 };
 
 // Static method to find active assistants
-assistantSchema.statics.findActive = function() {
+assistantSchema.statics.findActive = function () {
   return this.find({ status: 'active' })
     .populate('userId', 'firstName lastName email')
     .sort({ createdAt: -1 });
