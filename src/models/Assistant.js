@@ -183,20 +183,20 @@ const assistantSchema = new mongoose.Schema({
       },
       stability: {
         type: Number,
-        default: 90,
+        default: 0.90,
         min: 0,
-        max: 100
+        max: 1
       }, similarity_boost: {
         type: Number,
-        default: 84,
+        default: 0.84,
         min: 0,
-        max: 100
+        max: 1
       },
       speed: {
         type: Number,
-        default: 98,
+        default: 0.98,
         min: 0,
-        max: 100
+        max: 1
       },
       emotion: {
         type: String,
@@ -204,9 +204,9 @@ const assistantSchema = new mongoose.Schema({
       },
       emotion_strength: {
         type: Number,
-        default: 45,
+        default: 0.45,
         min: 0,
-        max: 100
+        max: 1
       },
       voice_pause_model: {
         type: String,
