@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const { PROJECTS } = require('../data/projects');
 
 const leadSchema = new mongoose.Schema(
   {
@@ -29,23 +28,8 @@ const leadSchema = new mongoose.Schema(
     },
     project_name: {
       type: String,
-      validate: {
-        validator: function(value) {
-          // If value exists, validate it
-          if (!value) return true; // Allow empty/null
-          // Case-insensitive enum validation
-          const projectLower = value.toLowerCase();
-          return PROJECTS.some(project => project.toLowerCase() === projectLower);
-        },
-        message: `project_name must be one of: ${PROJECTS.join(', ')}`
-      },
-      set: function(value) {
-        if (!value) return value;
-        // Normalize to proper case when saving
-        const projectLower = value.toLowerCase();
-        const matched = PROJECTS.find(project => project.toLowerCase() === projectLower);
-        return matched || value;
-      }
+      // Remove complex validation for now - we'll validate in controller
+      trim: true
     },
     // Scheduled call time - next time this lead should be called
     scheduled_call_time: {

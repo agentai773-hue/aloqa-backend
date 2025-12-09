@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const assignUserVoiceController = require('../controllers/assignUserVoiceController');
-const assignUserVoiceValidation = require('../../validators/assignUserVoiceValidation');
+const assignUserVoiceValidation = require('../../validators/admin/assignUserVoiceValidation');
 const { protect } = require('../../middleware/auth');
 
 // Apply authentication middleware to all routes

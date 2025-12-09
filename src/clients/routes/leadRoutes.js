@@ -1,92 +1,50 @@
 const express = require('express');
-const LeadController = require('../controllers/leadController');
-const LeadDashboardController = require('../controllers/leadDashboardController');
-const LeadTypeAutoUpdateController = require('../controllers/leadTypeAutoUpdateController');
+const router = express.Router();
+const leadController = require('../controllers/leadController');
+const { 
+  leadValidation, 
+  bulkLeadValidation, 
+  updateLeadValidation, 
+  handleValidationErrors 
+} = require('../../validators/client/leadValidation');
 const clientAuthMiddleware = require('../../middleware/clientMiddleware');
 
-const router = express.Router();
-const leadController = new LeadController();
-const leadDashboardController = new LeadDashboardController();
-const leadTypeAutoUpdateController = new LeadTypeAutoUpdateController();
+// Apply authentication middleware to all routes
+router.use(clientAuthMiddleware);
 
-/**
- * Get complete leads dashboard statistics (all counts + leads data)
- * GET /api/leads/dashboard
- */
-router.get('/dashboard', clientAuthMiddleware, (req, res) =>
-  leadDashboardController.getLeadsDashboardStats(req, res)
+// Create single lead
+router.post('/', leadValidation, handleValidationErrors, (req, res) => 
+  leadController.create(req, res)
 );
 
-/**
- * Get leads with filters
- * POST /api/leads/dashboard/filtered
- */
-router.post('/dashboard/filtered', clientAuthMiddleware, (req, res) =>
-  leadDashboardController.getLeadsWithFilters(req, res)
+// Create multiple leads
+router.post('/bulk', bulkLeadValidation, handleValidationErrors, (req, res) => 
+  leadController.createBulk(req, res)
 );
 
-// Get available projects
-router.get('/projects/list', (req, res) =>
-  leadController.getProjects(req, res)
+// Get all leads (with pagination and filtering)
+router.get('/', (req, res) => 
+  leadController.getAll(req, res)
 );
 
-// Check if lead exists by contact number
-router.get('/check', clientAuthMiddleware, (req, res) =>
-  leadController.checkLeadExists(req, res)
-);
-
-// Create a new lead
-router.post('/create', clientAuthMiddleware, (req, res) =>
-  leadController.createLead(req, res)
-);
-
-// Get all leads
-router.get('/all', clientAuthMiddleware, (req, res) =>
-  leadController.getAllLeads(req, res)
+// Get lead statistics
+router.get('/stats', (req, res) => 
+  leadController.getStats(req, res)
 );
 
 // Get lead by ID
-router.get('/:id', clientAuthMiddleware, (req, res) =>
-  leadController.getLeadById(req, res)
+router.get('/:id', (req, res) => 
+  leadController.getById(req, res)
 );
 
 // Update lead
-router.put('/:id', clientAuthMiddleware, (req, res) =>
-  leadController.updateLead(req, res)
+router.put('/:id', updateLeadValidation, handleValidationErrors, (req, res) => 
+  leadController.update(req, res)
 );
 
-// Delete lead
-router.delete('/:id', clientAuthMiddleware, (req, res) =>
-  leadController.deleteLead(req, res)
-);
-
-// Import leads from CSV
-router.post('/import/csv', clientAuthMiddleware, (req, res) =>
-  leadController.importLeads(req, res)
-);
-
-// Search leads with filters
-router.post('/search', clientAuthMiddleware, (req, res) =>
-  leadController.searchLeads(req, res)
-);
-
-/**
- * Auto-Update Lead Type Routes
- */
-
-// Trigger daily auto-update manually
-router.put('/auto-update/trigger', clientAuthMiddleware, (req, res) =>
-  leadTypeAutoUpdateController.triggerDailyUpdate(req, res)
-);
-
-// Get auto-update stats
-router.get('/auto-update/stats', (req, res) =>
-  leadTypeAutoUpdateController.getStats(req, res)
-);
-
-// Confirm site visit and update lead to hot
-router.put('/site-visit/confirm/:siteVisitId', clientAuthMiddleware, (req, res) =>
-  leadTypeAutoUpdateController.confirmSiteVisit(req, res)
+// Delete lead (soft delete)
+router.delete('/:id', (req, res) => 
+  leadController.delete(req, res)
 );
 
 module.exports = router;

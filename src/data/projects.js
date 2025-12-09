@@ -14,6 +14,7 @@ const PROJECTS = [
   'Shilp Plaza',
   'Shilp Square',
   'Shilp Court',
+  'Shilp One',
 ];
 
 module.exports = {

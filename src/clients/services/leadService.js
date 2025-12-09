@@ -1,265 +1,188 @@
-const LeadRepository = require('../repositories/leadRepository');
+const leadRepository = require('../repositories/leadRepository');
 
 class LeadService {
-  constructor() {
-    this.leadRepository = new LeadRepository();
-  }
-
-  async checkLeadExists(contactNumber, userId) {
+  // Get all leads for a client with filtering
+  async getAllLeads(clientId, filters = {}) {
     try {
-      const lead = await this.leadRepository.findByContactNumber(contactNumber, userId);
-      if (lead) {
-        return {
-          success: true,
-          exists: true,
-          data: lead,
-          message: 'Lead already exists',
-        };
-      }
-      return {
-        success: true,
-        exists: false,
-        message: 'Lead does not exist',
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
-  }
-
-  async createLead(leadData, userId) {
-    try {
-      if (!leadData.full_name || !leadData.contact_number || !leadData.lead_type) {
-        throw new Error('Missing required fields: full_name, contact_number, lead_type');
+      if (!clientId) {
+        throw new Error('Client ID is required');
       }
 
-      // Check if lead with same contact number already exists for this user
-      const existingLead = await this.leadRepository.findByContactNumber(leadData.contact_number, userId);
-      if (existingLead) {
-        return {
-          success: false,
-          error: `Lead with contact number ${leadData.contact_number} already exists`,
-        };
-      }
+      // Update the filters to use userId terminology  
+      const updatedFilters = {
+        ...filters,
+        userId: clientId
+      };
 
-      // Add userId to lead data
-      const leadWithUserId = { ...leadData, user_id: userId };
-      const lead = await this.leadRepository.create(leadWithUserId);
+      const result = await leadRepository.getAll(updatedFilters);
+      
       return {
         success: true,
-        data: lead,
-        message: 'Lead created successfully',
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
-  }
-
-  async getAllLeads(userId) {
-    try {
-      const leads = await this.leadRepository.findAll(userId);
-      return {
-        success: true,
-        data: leads,
         message: 'Leads fetched successfully',
+        data: {
+          leads: result.leads,
+          total: result.total,
+          page: result.page,
+          limit: result.limit,
+          totalPages: result.totalPages
+        }
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
+      throw new Error(`Service error: ${error.message}`);
     }
   }
 
-  async getLeadById(id, userId) {
+  // Get single lead
+  async getLead(leadId, clientId) {
     try {
-      const lead = await this.leadRepository.findById(id, userId);
-      if (!lead) {
-        return {
-          success: false,
-          error: 'Lead not found',
-        };
+      if (!leadId || !clientId) {
+        throw new Error('Lead ID and Client ID are required');
       }
+
+      const lead = await leadRepository.getById(leadId);
+      
+      // Verify lead belongs to client
+      if (lead.user_id?.toString() !== clientId) {
+        throw new Error('Lead not found or access denied');
+      }
+      
       return {
         success: true,
-        data: lead,
         message: 'Lead fetched successfully',
+        data: lead
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
+      throw new Error(`Service error: ${error.message}`);
     }
   }
 
-  async updateLead(id, leadData, userId) {
+  // Create new lead
+  async createLead(clientId, leadData) {
     try {
-      const lead = await this.leadRepository.findById(id, userId);
-      if (!lead) {
-        return {
-          success: false,
-          error: 'Lead not found',
-        };
+      if (!clientId) {
+        throw new Error('Client ID is required');
       }
 
-      // If contact_number is being updated, check if new number already exists for this user
-      if (leadData.contact_number && leadData.contact_number !== lead.contact_number) {
-        const existingLead = await this.leadRepository.findByContactNumber(leadData.contact_number, userId);
-        if (existingLead) {
-          return {
-            success: false,
-            error: `Lead with contact number ${leadData.contact_number} already exists`,
-          };
-        }
-      }
+      // Prepare lead data with userId
+      const newLeadData = {
+        ...leadData,
+        user_id: clientId
+      };
 
-      const updatedLead = await this.leadRepository.update(id, leadData, userId);
-      if (!updatedLead) {
-        return {
-          success: false,
-          error: 'Failed to update lead',
-        };
-      }
+      const lead = await leadRepository.create(newLeadData);
+      
       return {
         success: true,
-        data: updatedLead,
-        message: 'Lead updated successfully',
+        message: 'Lead created successfully',
+        data: lead
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
+      throw new Error(`Service error: ${error.message}`);
     }
   }
 
-  async deleteLead(id, userId) {
+  // Create multiple leads
+  async createBulkLeads(clientId, leadsData) {
     try {
-      const lead = await this.leadRepository.delete(id, userId);
-      if (!lead) {
-        return {
-          success: false,
-          error: 'Lead not found',
-        };
+      if (!clientId) {
+        throw new Error('Client ID is required');
       }
-      return {
-        success: true,
-        data: lead,
-        message: 'Lead deleted successfully',
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
-  }
 
-  async importLeadsFromCSV(leadsData, userId) {
-    try {
       if (!Array.isArray(leadsData) || leadsData.length === 0) {
-        throw new Error('Invalid CSV data');
+        throw new Error('Leads array is required and must not be empty');
       }
 
-      // Validate and prepare data, but skip rows with missing required fields
-      const seenNumbers = new Set();
-      const validLeads = [];
-      const duplicatesInCSV = [];
-      const invalidRows = [];
+      // Prepare all leads with userId
+      const newLeadsData = leadsData.map(lead => ({
+        ...lead,
+        user_id: clientId
+      }));
 
-      for (const row of leadsData) {
-        const full_name = row.full_name;
-        const contact_number = row.contact_number;
-        const lead_type = row.lead_type;
-
-        if (!full_name || !contact_number || !lead_type) {
-          invalidRows.push({ row, reason: 'Missing required fields' });
-          continue;
-        }
-
-        if (seenNumbers.has(contact_number)) {
-          duplicatesInCSV.push(contact_number);
-          continue;
-        }
-
-        seenNumbers.add(contact_number);
-        validLeads.push({
-          full_name,
-          contact_number,
-          lead_type,
-          call_status: row.call_status || 'pending',
-          project_name: row.project_name || null,
-          user_id: userId,
-        });
-      }
-
-      // If nothing valid to create, return informative response
-      if (validLeads.length === 0) {
-        return {
-          success: true,
-          data: [],
-          message: 'No valid leads to import',
-          meta: {
-            skippedDuplicatesInCSV: [...new Set(duplicatesInCSV)],
-            invalidRows,
-          },
-        };
-      }
-
-      // Check for existing leads in database for this user and skip them
-      const contactNumbers = validLeads.map((l) => l.contact_number);
-      const existingLeads = await this.leadRepository.findByContactNumbers(contactNumbers, userId);
-      const existingPhones = existingLeads.map((lead) => lead.contact_number);
-
-      const toCreate = validLeads.filter((l) => !existingPhones.includes(l.contact_number));
-      const skippedExisting = validLeads.filter((l) => existingPhones.includes(l.contact_number)).map(l => l.contact_number);
-
-      let createdLeads = [];
-      if (toCreate.length > 0) {
-        createdLeads = await this.leadRepository.createBulk(toCreate);
-      }
-
+      const leads = await leadRepository.createBulk(newLeadsData);
+      
       return {
         success: true,
-        data: createdLeads,
-        message: `${createdLeads.length} leads imported successfully`,
-        meta: {
-          skippedDuplicatesInCSV: [...new Set(duplicatesInCSV)],
-          skippedExistingInDB: [...new Set(skippedExisting)],
-          invalidRows,
-        },
+        message: `${leads.length} leads created successfully`,
+        data: {
+          created: leads.length,
+          leads: leads
+        }
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
+      throw new Error(`Service error: ${error.message}`);
     }
   }
 
-  // Search leads with filters
-  async searchLeads(userId, searchTerm = '', page = 1, pageSize = 10, filters = {}) {
+  // Update lead
+  async updateLead(leadId, clientId, updateData) {
     try {
-      const result = await this.leadRepository.searchLeads(userId, searchTerm, page, pageSize, filters);
+      if (!leadId || !clientId) {
+        throw new Error('Lead ID and Client ID are required');
+      }
+
+      // First verify lead belongs to client
+      const existingLead = await leadRepository.getById(leadId);
+      if (existingLead.user_id?.toString() !== clientId) {
+        throw new Error('Lead not found or access denied');
+      }
+
+      // Remove userId from update data if present (shouldn't be changed)
+      const { userId: _, ...safeUpdateData } = updateData;
+
+      const lead = await leadRepository.update(leadId, safeUpdateData);
+      
       return {
         success: true,
-        data: result.leads,
-        pagination: result.pagination,
-        message: 'Leads searched successfully',
+        message: 'Lead updated successfully',
+        data: lead
       };
     } catch (error) {
+      throw new Error(`Service error: ${error.message}`);
+    }
+  }
+
+  // Delete lead
+  async deleteLead(leadId, clientId) {
+    try {
+      if (!leadId || !clientId) {
+        throw new Error('Lead ID and Client ID are required');
+      }
+
+      // First verify lead belongs to client
+      const existingLead = await leadRepository.getById(leadId);
+      if (existingLead.user_id?.toString() !== clientId) {
+        throw new Error('Lead not found or access denied');
+      }
+
+      const result = await leadRepository.delete(leadId);
+      
       return {
-        success: false,
-        error: error.message,
+        success: true,
+        message: result.message
       };
+    } catch (error) {
+      throw new Error(`Service error: ${error.message}`);
+    }
+  }
+
+  // Get lead statistics
+  async getLeadStats(clientId) {
+    try {
+      if (!clientId) {
+        throw new Error('Client ID is required');
+      }
+
+      const stats = await leadRepository.getStats(clientId);
+      
+      return {
+        success: true,
+        message: 'Lead statistics fetched successfully',
+        data: stats
+      };
+    } catch (error) {
+      throw new Error(`Service error: ${error.message}`);
     }
   }
 }
 
-module.exports = LeadService;
+module.exports = new LeadService();

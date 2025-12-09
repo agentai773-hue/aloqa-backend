@@ -1,57 +1,28 @@
-// clients/controllers/assistantController.js
-const AssistantService = require('../services/assistantService');
+const Assistant = require('../../models/Assistant');
 
 class AssistantController {
-  constructor() {
-    this.assistantService = new AssistantService();
-  }
-
-  /**
-   * Get all assistants for authenticated user
-   * GET /clients/assistants
-   */
-  async getAllAssistants(req, res) {
+  // Get assistants for current user
+  async getUserAssistants(req, res) {
     try {
-      const userId = req.user._id;
+      const userId = req.user.id;
 
-      const result = await this.assistantService.getAllAssistants(userId);
+      const assistants = await Assistant.find({ 
+        userId: userId 
+      }).select('_id agentId agentName agentType').sort({ createdAt: -1 });
 
-      if (!result.success) {
-        return res.status(400).json(result);
-      }
-
-      return res.status(200).json(result);
-    } catch (error) {
-      return res.status(500).json({
-        success: false,
-        error: error.message
+      res.status(200).json({
+        success: true,
+        message: 'Assistants fetched successfully',
+        data: assistants
       });
-    }
-  }
-
-  /**
-   * Get single assistant by ID
-   * GET /clients/assistants/:id
-   */
-  async getAssistantById(req, res) {
-    try {
-      const { id } = req.params;
-      const userId = req.user._id;
-
-      const result = await this.assistantService.getAssistantById(id, userId);
-
-      if (!result.success) {
-        return res.status(404).json(result);
-      }
-
-      return res.status(200).json(result);
     } catch (error) {
-      return res.status(500).json({
+      console.error('❌ Get user assistants error:', error);
+      res.status(500).json({
         success: false,
-        error: error.message
+        message: error.message || 'Failed to get user assistants'
       });
     }
   }
 }
 
-module.exports = AssistantController;
+module.exports = new AssistantController();

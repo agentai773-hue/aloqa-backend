@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { login, verify, logout, requestPasswordReset, resetPasswordWithOTP } = require('../controllers/authController');
-const { clientLoginValidation, handleValidationErrors } = require('../../validators/authClientValidation');
+const { clientLoginValidation, handleValidationErrors } = require('../../validators/client/authValidation');
 const clientAuthMiddleware = require('../../middleware/clientMiddleware');
 
 // Client login route

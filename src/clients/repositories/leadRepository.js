@@ -1,211 +1,183 @@
 const Lead = require('../../models/Lead');
 
 class LeadRepository {
+  // Create a new lead
   async create(leadData) {
     try {
       const lead = new Lead(leadData);
-      await lead.save();
-      return lead;
+      return await lead.save();
     } catch (error) {
-      throw new Error(`Error creating lead: ${error.message}`);
+      throw new Error(`Failed to create lead: ${error.message}`);
     }
   }
 
-  async findAll(userId) {
-    try {
-      const leads = await Lead.find({ 
-        user_id: userId,
-        deleted_at: null 
-      }).sort({ created_at: -1 });
-      return leads;
-    } catch (error) {
-      throw new Error(`Error fetching leads: ${error.message}`);
-    }
-  }
-
-  async findById(id, userId) {
-    try {
-      const lead = await Lead.findOne({ 
-        _id: id,
-        user_id: userId,
-        deleted_at: null 
-      });
-      return lead;
-    } catch (error) {
-      throw new Error(`Error finding lead: ${error.message}`);
-    }
-  }
-
-  async update(id, leadData, userId) {
-    try {
-      // Use findByIdAndUpdate to avoid full document validation
-      // This allows partial updates without triggering required field validation
-      const updatedLead = await Lead.findByIdAndUpdate(
-        id,
-        { $set: leadData },
-        { 
-          new: true,
-          runValidators: false // Skip Mongoose validation to allow partial updates
-        }
-      );
-      
-      if (!updatedLead) {
-        return null;
-      }
-
-      // Verify user ownership
-      if (updatedLead.user_id.toString() !== userId.toString()) {
-        return null;
-      }
-
-      return updatedLead;
-    } catch (error) {
-      throw new Error(`Error updating lead: ${error.message}`);
-    }
-  }
-
-  async delete(id, userId) {
-    try {
-      const lead = await Lead.findOne({ 
-        _id: id,
-        user_id: userId,
-        deleted_at: null 
-      });
-      if (!lead) {
-        return null;
-      }
-      lead.deleted_at = new Date();
-      await lead.save();
-      return lead;
-    } catch (error) {
-      throw new Error(`Error deleting lead: ${error.message}`);
-    }
-  }
-
-  async findByContactNumber(contactNumber, userId) {
-    try {
-      const lead = await Lead.findOne({ 
-        contact_number: contactNumber,
-        user_id: userId,
-        deleted_at: null 
-      });
-      return lead;
-    } catch (error) {
-      throw new Error(`Error finding lead by contact number: ${error.message}`);
-    }
-  }
-
-  async findByContactNumbers(contactNumbers, userId) {
-    try {
-      const leads = await Lead.find({ 
-        contact_number: { $in: contactNumbers },
-        user_id: userId,
-        deleted_at: null 
-      });
-      return leads;
-    } catch (error) {
-      throw new Error(`Error finding leads by contact numbers: ${error.message}`);
-    }
-  }
-
+  // Create multiple leads at once
   async createBulk(leadsData) {
     try {
-      const leads = await Lead.insertMany(leadsData);
-      return leads;
+      return await Lead.insertMany(leadsData, { ordered: false });
     } catch (error) {
-      throw new Error(`Error bulk creating leads: ${error.message}`);
+      throw new Error(`Failed to create leads: ${error.message}`);
     }
   }
 
-  // Search leads with filters: searchTerm, lead_type, call_status, date_range
-  async searchLeads(userId, searchTerm = '', page = 1, pageSize = 10, filters = {}) {
+  // Get all leads with pagination and filtering
+  async getAll(filters = {}) {
     try {
-      const skip = (page - 1) * pageSize;
+      const { 
+        page = 1, 
+        limit = 10, 
+        search = '', 
+        status = '', 
+        leadType = '',
+        userId 
+      } = filters;
 
-      // Start with base query - only non-deleted leads
-      let query = { 
-        user_id: userId,
-        deleted_at: null 
-      };
+      // Build query
+      const query = { deleted_at: null };
 
-      // Add search term filter if provided (search across name, contact_number, project_name)
-      if (searchTerm && searchTerm.trim()) {
-        const searchRegex = new RegExp(searchTerm, 'i');
+      // Add user filter
+      if (userId) {
+        query.user_id = userId;
+      }
+
+      // Add status filter (map to call_status)
+      if (status) {
+        query.call_status = status;
+      }
+
+      // Add lead type filter
+      if (leadType) {
+        query.lead_type = leadType;
+      }
+
+      // Add search filter
+      if (search) {
         query.$or = [
-          { full_name: searchRegex },
-          { contact_number: searchRegex },
-          { project_name: searchRegex }
+          { full_name: { $regex: search, $options: 'i' } },
+          { contact_number: { $regex: search, $options: 'i' } },
+          { project_name: { $regex: search, $options: 'i' } }
         ];
       }
 
-      // Add lead_type filter if provided
-      if (filters.leadType && filters.leadType !== 'all') {
-        query.lead_type = filters.leadType;
-      }
+      // Calculate skip
+      const skip = (page - 1) * limit;
 
-      // Add call_status filter if provided
-      if (filters.callStatus && filters.callStatus !== 'all') {
-        query.call_status = filters.callStatus;
-      }
-
-      // Add date_range filter if provided
-      if (filters.dateRange && filters.dateRange !== 'all') {
-        const now = new Date();
-        let startDate;
-
-        switch (filters.dateRange) {
-          case 'today':
-            startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            break;
-          case 'yesterday':
-            const yesterday = new Date(now);
-            yesterday.setDate(yesterday.getDate() - 1);
-            startDate = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
-            const endYesterday = new Date(startDate);
-            endYesterday.setDate(endYesterday.getDate() + 1);
-            query.created_at = { $gte: startDate, $lt: endYesterday };
-            break;
-          case 'last_week':
-            startDate = new Date(now);
-            startDate.setDate(startDate.getDate() - 7);
-            break;
-          case 'last_month':
-            startDate = new Date(now);
-            startDate.setDate(startDate.getDate() - 30);
-            break;
-          default:
-            break;
-        }
-
-        // Only add date filter if not yesterday (which has special logic)
-        if (filters.dateRange !== 'yesterday' && startDate) {
-          query.created_at = { $gte: startDate };
-        }
-      }
-
-
-      // Execute query
-      const leads = await Lead.find(query)
-        .sort({ created_at: -1 })
-        .limit(pageSize)
-        .skip(skip);
-
-      const total = await Lead.countDocuments(query);
-
+      // Execute queries
+      const [leads, total] = await Promise.all([
+        Lead.find(query)
+          .populate('user_id', 'email username')
+          .sort({ created_at: -1 })
+          .skip(skip)
+          .limit(parseInt(limit)),
+        Lead.countDocuments(query)
+      ]);
 
       return {
         leads,
-        pagination: {
-          total,
-          page,
-          pageSize,
-          totalPages: Math.ceil(total / pageSize),
-        },
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(total / limit)
       };
     } catch (error) {
-      throw new Error(`Error searching leads: ${error.message}`);
+      throw new Error(`Failed to get leads: ${error.message}`);
+    }
+  }
+
+  // Get lead by ID
+  async getById(id) {
+    try {
+      const lead = await Lead.findOne({ _id: id, deleted_at: null })
+        .populate('user_id', 'email username');
+      
+      if (!lead) {
+        throw new Error('Lead not found');
+      }
+      
+      return lead;
+    } catch (error) {
+      throw new Error(`Failed to get lead: ${error.message}`);
+    }
+  }
+
+  // Update lead
+  async update(id, updateData) {
+    try {
+      const lead = await Lead.findOneAndUpdate(
+        { _id: id, deleted_at: null },
+        { ...updateData, updated_at: new Date() },
+        { new: true, runValidators: true }
+      ).populate('user_id', 'email username');
+
+      if (!lead) {
+        throw new Error('Lead not found');
+      }
+
+      return lead;
+    } catch (error) {
+      throw new Error(`Failed to update lead: ${error.message}`);
+    }
+  }
+
+  // Soft delete lead
+  async delete(id) {
+    try {
+      const lead = await Lead.findOneAndUpdate(
+        { _id: id, deleted_at: null },
+        { deleted_at: new Date() },
+        { new: true }
+      );
+
+      if (!lead) {
+        throw new Error('Lead not found');
+      }
+
+      return { message: 'Lead deleted successfully' };
+    } catch (error) {
+      throw new Error(`Failed to delete lead: ${error.message}`);
+    }
+  }
+
+  // Get leads statistics
+  async getStats(userId = null) {
+    try {
+      const matchFilter = { deleted_at: null };
+      if (userId) {
+        matchFilter.user_id = userId;
+      }
+
+      const stats = await Lead.aggregate([
+        { $match: matchFilter },
+        {
+          $group: {
+            _id: '$lead_type',
+            count: { $sum: 1 }
+          }
+        }
+      ]);
+
+      const statsObj = {
+        total: 0,
+        hot: 0,
+        cold: 0,
+        fake: 0,
+        pending: 0,
+        connected: 0,
+        not_interested: 0
+      };
+
+      stats.forEach(stat => {
+        if (stat._id && statsObj.hasOwnProperty(stat._id)) {
+          statsObj[stat._id] = stat.count;
+          statsObj.total += stat.count;
+        }
+      });
+
+      return statsObj;
+    } catch (error) {
+      throw new Error(`Failed to get lead statistics: ${error.message}`);
     }
   }
 }
 
-module.exports = LeadRepository;
+module.exports = new LeadRepository();

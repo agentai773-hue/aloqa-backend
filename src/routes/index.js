@@ -1,96 +1,34 @@
 const express = require('express');
-const authRoutes = require('../admin/routes/authRoutes');
-const userRoutes = require('../admin/routes/userRoutes');
-const assistantRoutes = require('../admin/routes/assistantRoutes');
-const phoneNumberRoutes = require('../admin/routes/phoneNumberRoutes');
-const voiceRoutes = require('../admin/routes/voiceRoutes');
-const assignUserVoiceRoutes = require('../admin/routes/assignUserVoiceRoutes');
-const verifyEmailRoutes = require('./verifyEmail');
-const clientAuthRoutes = require('../clients/routes/authRoutes');
-const leadRoutes = require('../clients/routes/leadRoutes');
-const clientAssistantRoutes = require('../clients/routes/assistantRoutes');
-const clientPhoneNumberRoutes = require('../clients/routes/phoneNumberRoutes');
-const assignAssistantPhoneRoutes = require('../clients/routes/assignAssistantPhoneRoutes');
-const callRoutes = require('../clients/routes/callRoutes');
-const callHistoryRoutes = require('../clients/routes/callHistoryRoutes');
-const autoCallRoutes = require('../clients/routes/autoCallRoutes');
-const scheduledCallsRoutes = require('../clients/routes/scheduledCallsRoutes');
-const siteVisitRoutes = require('../clients/routes/siteVisitRoutes');
-const siteUserRoutes = require('../clients/routes/siteUserRoutes');
-const dashboardRoutes = require('../clients/routes/dashboardRoutes');
-
 const router = express.Router();
+
+// Import route modules
+const adminRoutes = require('./admin');
+const clientRoutes = require('./client');
+
+// Mount routes
+router.use('/admin', adminRoutes);
+router.use('/client', clientRoutes);
 
 // Health check endpoint
 router.get('/health', (req, res) => {
-  res.json({
-    success: true,
-    message: 'API is running',
-    timestamp: new Date().toISOString()
+  res.status(200).json({
+    status: 'OK',
+    message: 'Aloqa AI API Server is running',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0'
   });
 });
 
-// Email verification routes (Public)
-router.use('/verify-email', verifyEmailRoutes);
-
-// admin routes 
-
-// Authentication routes
-router.use('/admin/auth', authRoutes);
-
-// User management routes
-router.use('/users', userRoutes);
-
-// Assistant management routes
-router.use('/assistants', assistantRoutes);
-
-// Phone number management routes
-router.use('/phone-numbers', phoneNumberRoutes);
-
-// Voice management routes
-router.use('/voices', voiceRoutes);
-
-// Voice assignment routes (admin)
-router.use('/admin/assign-user-voice', assignUserVoiceRoutes);
-
-// user routes
-
-/// clients routes
-
-// Lead management routes
-router.use('/leads', leadRoutes);
-
-// Assistant management routes (client)
-router.use('/client-assistants', clientAssistantRoutes);
-
-// Phone number management routes (client)
-router.use('/client-phone-numbers', clientPhoneNumberRoutes);
-
-// Assign Assistant and Phone routes (client)
-router.use('/client-assign-assistant-phone', assignAssistantPhoneRoutes);
-
-// Call routes (client)
-router.use('/client-call', callRoutes);
-
-// Call history routes (client)
-router.use('/client-call', callHistoryRoutes);
-
-// Auto-call routes (client)
-router.use('/client-call', autoCallRoutes);
-
-// Scheduled calls routes (client)
-router.use('/client-calls', scheduledCallsRoutes);
-
-// Site visit routes (client)
-router.use('/client-site-visits', siteVisitRoutes);
-
-// Site user routes (client)
-router.use('/client-site-users', siteUserRoutes);
-
-// Dashboard routes (client)
-router.use('/client-dashboard', dashboardRoutes);
-
-router.use('/client-auth', clientAuthRoutes);
-
+// Root endpoint
+router.get('/', (req, res) => {
+  res.status(200).json({
+    message: 'Welcome to Aloqa AI API',
+    endpoints: {
+      admin: '/api/admin',
+      client: '/api/client',
+      health: '/api/health'
+    }
+  });
+});
 
 module.exports = router;
