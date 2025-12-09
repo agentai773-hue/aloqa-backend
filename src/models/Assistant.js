@@ -214,11 +214,11 @@ const assistantSchema = new mongoose.Schema({
       },
       auto_punctuation_pause: {
         type: Boolean,
-        default: false
+        default: true
       },
       dynamic_emotion_adaptation: {
         type: Boolean,
-        default: true
+        default: false
       },
       use_speaker_boost: {
         type: Boolean,
