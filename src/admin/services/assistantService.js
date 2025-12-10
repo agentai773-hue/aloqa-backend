@@ -16,11 +16,11 @@ class AssistantService {
     if (obj === null || obj === undefined || typeof obj !== 'object') {
       return obj;
     }
-    
+
     if (Array.isArray(obj)) {
       return obj.map(item => this.camelToSnake(item));
     }
-    
+
     const snakeObj = {};
     for (const key in obj) {
       if (obj.hasOwnProperty(key)) {
@@ -37,181 +37,247 @@ class AssistantService {
    */
   processSynthesizerConfigForDB(synthesizerConfig) {
     const config = { ...synthesizerConfig };
-    
-    
+
+    console.log('💾 Processing synthesizer config for database:', JSON.stringify(synthesizerConfig, null, 2));
+
     // Handle ElevenLabs Provider - Remove engine field but keep voice name
     if (config.provider === 'elevenlabs' && config.provider_config) {
       const providerConfig = { ...config.provider_config };
-      
-      
+
+      console.log('💾 ElevenLabs Database Config - Cleaning fields');
+
       // Remove Polly-specific fields for ElevenLabs
       delete providerConfig.engine;  // Engine is only for Polly, not ElevenLabs
-      
+
       // Clean voice_id field if it has elevenlabs- prefix
       if (providerConfig.voice_id && providerConfig.voice_id.startsWith('elevenlabs-')) {
         providerConfig.voice_id = providerConfig.voice_id.replace('elevenlabs-', '');
       }
-      
+
       // Keep original voice name in database (do NOT overwrite with voice_id)
       // Database should store human-readable voice names
-      
+
       // Set default model if not provided
       if (!providerConfig.model) {
-        providerConfig.model = 'eleven_turbo_v2_5';
+        providerConfig.model = 'eleven_flash_v2_5';
       }
-      
+
       // Ensure sampling_rate is string
       if (providerConfig.sampling_rate) {
         providerConfig.sampling_rate = String(providerConfig.sampling_rate);
       }
-      
-     
-      
+      // 👉 Add new advanced ElevenLabs fields (0–100 allowed)
+      const advancedFields = [
+        'stability',
+        'similarity_boost',
+        'speed',
+        'emotion',
+        'emotion_strength',
+        'voice_pause_model',
+        'auto_punctuation_pause',
+        'dynamic_emotion_adaptation',
+        'use_speaker_boost'
+      ];
+
+      advancedFields.forEach(field => {
+        if (providerConfig[field] !== undefined) {
+          providerConfig[field] = providerConfig[field];
+        }
+      });
+
+
+
       config.provider_config = providerConfig;
     }
-    
+
     // Handle Polly Provider - Keep engine field, remove ElevenLabs fields
     else if (config.provider === 'polly' && config.provider_config) {
       const providerConfig = { ...config.provider_config };
-      
-      
+
+      console.log('💾 Polly Database Config - Cleaning fields');
+
       // For Polly, remove ElevenLabs specific fields
       delete providerConfig.voice_id;
       delete providerConfig.model;
-      
+
       // Set default voice to Kajal if not provided
       if (!providerConfig.voice) {
         providerConfig.voice = 'Kajal';
       }
-      
+
       // Set default engine if not provided
       if (!providerConfig.engine) {
         providerConfig.engine = 'neural';
       }
-      
+
       // Ensure sampling_rate is string
       if (providerConfig.sampling_rate) {
         providerConfig.sampling_rate = String(providerConfig.sampling_rate);
       }
 
-      
+      // 👉 Copy same block here for Bolna API
+      const advancedFields = [
+        'stability',
+        'similarity_boost',
+        'speed',
+        'emotion',
+        'emotion_strength',
+        'voice_pause_model',
+        'auto_punctuation_pause',
+        'dynamic_emotion_adaptation',
+        'use_speaker_boost'
+      ];
+
+      advancedFields.forEach(field => {
+        if (providerConfig[field] !== undefined) {
+          providerConfig[field] = providerConfig[field];
+        }
+      });
+
+
       config.provider_config = providerConfig;
     }
-    
+
     return config;
   }
   processSynthesizerConfig(synthesizerConfig) {
     const config = { ...synthesizerConfig };
-    
-    
+
+    console.log('🔧 Processing synthesizer config:', JSON.stringify(synthesizerConfig, null, 2));
+
     // Handle Manual Selection (Polly Provider)
     if (config.provider === 'polly' && config.provider_config) {
       const providerConfig = { ...config.provider_config };
-      
-      
+
+      console.log('🎯 Manual Selection Mode - Polly Provider');
+
       // For Polly, remove ElevenLabs specific fields
       delete providerConfig.voice_id;
       delete providerConfig.model;
-      
+
       // Set default voice to Kajal if not provided
       if (!providerConfig.voice) {
         providerConfig.voice = 'Kajal';
       }
-      
+
       // Set default engine if not provided
       if (!providerConfig.engine) {
         providerConfig.engine = 'neural';
       }
-      
+
       // Ensure sampling_rate is string
       if (providerConfig.sampling_rate) {
         providerConfig.sampling_rate = String(providerConfig.sampling_rate);
       }
-      
 
-      
+      console.log('✅ Polly Configuration (Without voice_id):');
+      console.log('- Provider:', config.provider);
+      console.log('- Voice:', providerConfig.voice);
+      console.log('- Engine:', providerConfig.engine);
+
       config.provider_config = providerConfig;
     }
-    
+
     // Handle Dynamic Selection (ElevenLabs Provider with User Assigned Voices)
     else if (config.provider === 'elevenlabs' && config.provider_config) {
       const providerConfig = { ...config.provider_config };
-      
-      
+
+      console.log('🎯 Dynamic Selection Mode - ElevenLabs Provider');
+
       // Clean voice_id field if it has elevenlabs- prefix
       if (providerConfig.voice_id && providerConfig.voice_id.startsWith('elevenlabs-')) {
         providerConfig.voice_id = providerConfig.voice_id.replace('elevenlabs-', '');
       }
-      
+
       // Clean voice field if it has elevenlabs- prefix
       if (providerConfig.voice && providerConfig.voice.startsWith('elevenlabs-')) {
         providerConfig.voice = providerConfig.voice.replace('elevenlabs-', '');
       }
-      
+
       // CRITICAL FIX: For ElevenLabs, Bolna expects voice ID in 'voice' field, NOT voice name
       // Based on your Postman working example where voice field contains voice ID
       if (providerConfig.voice_id) {
         // Store original voice name before overwriting
         const originalVoiceName = providerConfig.voice;
-        
+
         // Use voice_id as the voice field value (this is what Bolna expects)
         providerConfig.voice = providerConfig.voice_id;
-      
-      } 
-      
+
+      }
       // Remove Polly-specific fields for ElevenLabs
       delete providerConfig.engine;  // Engine is only for Polly, not ElevenLabs
-      
+
       // Set default model if not provided
       if (!providerConfig.model) {
-        providerConfig.model = 'eleven_turbo_v2_5';
+        providerConfig.model = 'eleven_flash_v2_5';
       }
-      
+
       // Ensure sampling_rate is string
       if (providerConfig.sampling_rate) {
         providerConfig.sampling_rate = String(providerConfig.sampling_rate);
       }
- 
-      
+
+      // 👉 Add advanced ElevenLabs fields to Bolna payload
+      const advancedFields = [
+        'stability',
+        'similarity_boost',
+        'speed',
+        'emotion',
+        'emotion_strength',
+        'voice_pause_model',
+        'auto_punctuation_pause',
+        'dynamic_emotion_adaptation',
+        'use_speaker_boost'
+      ];
+
+      advancedFields.forEach(field => {
+        if (providerConfig[field] !== undefined) {
+          providerConfig[field] = providerConfig[field];
+        }
+      });
+
+
       config.provider_config = providerConfig;
     }
-    
+
     // Handle other providers (future-proof for any new providers)
     else if (config.provider_config) {
       const providerConfig = { ...config.provider_config };
-      
+
       // Remove ElevenLabs specific fields for other providers
       delete providerConfig.voice_id;
       delete providerConfig.model;
-      
+
       // Ensure sampling_rate is string for all providers
       if (providerConfig.sampling_rate) {
         providerConfig.sampling_rate = String(providerConfig.sampling_rate);
       }
-      
+
       config.provider_config = providerConfig;
     }
-    
+
     // Handle other providers (future-proof for any new providers)
     else if (config.provider_config) {
       const providerConfig = { ...config.provider_config };
-      
-    
-      
+
+      console.log('🎯 Other Provider Configuration');
+
       // Remove ElevenLabs specific fields for other providers
       delete providerConfig.voice_id;
       delete providerConfig.model;
-      
+
       // Ensure sampling_rate is string for all providers
       if (providerConfig.sampling_rate) {
         providerConfig.sampling_rate = String(providerConfig.sampling_rate);
       }
-      
-   
-      
+
+      console.log('✅ Other Provider Configuration (Clean):');
+      console.log('- Provider:', config.provider);
+      console.log('- Config:', JSON.stringify(providerConfig, null, 2));
+
       config.provider_config = providerConfig;
     }
-    
+
     return config;
   }
 
@@ -237,9 +303,8 @@ class AssistantService {
 
     // Process synthesizer config to ensure proper voice handling
     const processedSynthesizerConfig = this.processSynthesizerConfig(assistantData.synthesizerConfig);
-    
 
-  
+
     // Build Bolna API v2 payload - use exact values from frontend
     const bolnaPayload = {
       agent_config: {
@@ -270,7 +335,14 @@ class AssistantService {
               stream: assistantData.transcriberConfig.stream,
               sampling_rate: assistantData.transcriberConfig.sampling_rate,
               encoding: assistantData.transcriberConfig.encoding,
-              endpointing: assistantData.transcriberConfig.endpointing
+              endpointing: assistantData.transcriberConfig.endpointing,
+              punctuate: assistantData.transcriberConfig.punctuate,
+              interim_results: assistantData.transcriberConfig.interim_results,
+              smart_format: assistantData.transcriberConfig.smart_format,
+
+
+
+
             },
             input: {
               provider: assistantData.inputConfig.provider,
@@ -290,7 +362,9 @@ class AssistantService {
             incremental_delay: assistantData.taskConfig.incremental_delay,
             number_of_words_for_interruption: assistantData.taskConfig.number_of_words_for_interruption,
             backchanneling: assistantData.taskConfig.backchanneling,
-            call_terminate: assistantData.taskConfig.call_terminate
+            call_terminate: assistantData.taskConfig.call_terminate,
+            optimize_latency: assistantData.taskConfig.optimize_latency,
+
           }
         }]
       },
@@ -301,7 +375,9 @@ class AssistantService {
       }
     };
 
-
+    // Log complete Bolna API payload for debugging
+    console.log('🚀 Complete Bolna API Payload:');
+    console.log(JSON.stringify(bolnaPayload, null, 2));
 
     const response = await axios.post(
       `${BOLNA_API_URL}/v2/agent`,
@@ -328,11 +404,11 @@ class AssistantService {
     if (updateData.agentName !== undefined) {
       agentConfigUpdates.agent_name = updateData.agentName;
     }
-    
+
     if (updateData.agentWelcomeMessage !== undefined) {
       agentConfigUpdates.agent_welcome_message = updateData.agentWelcomeMessage;
     }
-    
+
     if (updateData.webhookUrl !== undefined) {
       agentConfigUpdates.webhook_url = updateData.webhookUrl || null;
     }
@@ -396,7 +472,7 @@ class AssistantService {
   async createAssistant(assistantData, adminId) {
     // Get user's bearer token
     const user = await userRepository.findById(assistantData.userId);
-    
+
     if (!user) {
       const error = new Error('User not found');
       error.status = 404;
@@ -414,7 +490,7 @@ class AssistantService {
 
     // Step 2: Process assistant data for database (clean up fields based on provider)
     const processedDbData = this.processSynthesizerConfigForDB(assistantData.synthesizerConfig);
-    
+
     // Step 3: Save to database with Bolna agent ID and processed config
     const dbData = {
       ...assistantData,
@@ -426,7 +502,7 @@ class AssistantService {
     };
 
     const assistant = await assistantRepository.create(dbData);
-    
+
     return assistant;
   }
 
@@ -475,7 +551,7 @@ class AssistantService {
     };
 
     const updatedAssistant = await assistantRepository.update(id, updateFields);
-    
+
     return updatedAssistant;
   }
 
@@ -485,7 +561,7 @@ class AssistantService {
   async getAllAssistants(filters = {}) {
     const assistants = await assistantRepository.findAll(filters);
     const total = await assistantRepository.countAssistants(filters);
-    
+
     return {
       assistants,
       total,
@@ -499,7 +575,7 @@ class AssistantService {
    */
   async getAssistantById(id) {
     const assistant = await assistantRepository.findById(id);
-    
+
     if (!assistant || assistant.status === 'deleted') {
       const error = new Error('Assistant not found');
       error.status = 404;
@@ -543,7 +619,7 @@ class AssistantService {
 
     // Step 2: Delete from database (only if Bolna succeeded)
     await assistantRepository.delete(id);
-    
+
     return { message: 'Assistant deleted successfully' };
   }
 }
