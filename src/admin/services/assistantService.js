@@ -59,7 +59,7 @@ class AssistantService {
 
       // Set default model if not provided
       if (!providerConfig.model) {
-        providerConfig.model = 'eleven_multilingual_v2';
+        providerConfig.model = 'eleven_flash_v2_5';
       }
 
       // Ensure sampling_rate is string
@@ -209,7 +209,7 @@ class AssistantService {
 
       // Set default model if not provided
       if (!providerConfig.model) {
-        providerConfig.model = 'eleven_multilingual_v2';
+        providerConfig.model = 'eleven_flash_v2_5';
       }
 
       // Ensure sampling_rate is string
