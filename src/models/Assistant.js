@@ -179,7 +179,7 @@ const assistantSchema = new mongoose.Schema({
       model: {
         type: String,
         default: null,
-        comment: 'ElevenLabs model (e.g., eleven_turbo_v2_5,eleven_multilingual_v2)'
+        comment: 'ElevenLabs model (e.g., eleven_turbo_v2_5,eleven_flash_v2_5)'
       },
       stability: {
         type: Number,
@@ -273,7 +273,7 @@ const assistantSchema = new mongoose.Schema({
     },
     interim_results: {
       type: Boolean,
-      default: true
+      default: false
     },
     punctuate: {
       type: Boolean,
