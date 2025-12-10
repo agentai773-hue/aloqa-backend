@@ -14,8 +14,14 @@ const transformLeadToFrontend = (lead) => {
     interestedProject: lead.project_name || '',
     leadType: lead.lead_type === 'pending' ? 'cold' : lead.lead_type,
     notes: '', // Not stored in backend model
-    status: lead.call_status === 'pending' ? 'new' : 'old',
     projectId: lead.project_name || '',
+    // Call-related fields
+    call_status: lead.call_status || 'pending',
+    call_attempt_count: lead.call_attempt_count || 0,
+    max_retry_attempts: lead.max_retry_attempts || 3,
+    call_disposition: lead.call_disposition,
+    last_call_attempt_time: lead.last_call_attempt_time,
+    next_scheduled_call_time: lead.next_scheduled_call_time,
     // Removed userId since frontend no longer needs it
     createdAt: lead.created_at,
     updatedAt: lead.updated_at
@@ -29,7 +35,12 @@ const transformLeadToBackend = (lead, clientId) => {
     contact_number: lead.phone,
     project_name: lead.interestedProject,
     lead_type: lead.leadType || 'pending',
-    call_status: lead.status === 'new' ? 'pending' : 'completed',
+    call_status: lead.call_status || 'pending',
+    call_attempt_count: lead.call_attempt_count || 0,
+    max_retry_attempts: lead.max_retry_attempts || 3,
+    call_disposition: lead.call_disposition,
+    last_call_attempt_time: lead.last_call_attempt_time,
+    next_scheduled_call_time: lead.next_scheduled_call_time,
     user_id: clientId // Always use clientId from token, never from frontend
   };
 };
@@ -126,7 +137,47 @@ const leadController = {
       }
 
       const { leads } = req.body;
-      const leadsData = leads.map(lead => transformLeadToBackend(lead, clientId));
+      
+      // Remove duplicates based on phone number within same project only - keep first occurrence
+      const seenProjectPhones = new Set(); // Store "project_phone" combinations
+      const uniqueLeads = [];
+      const removedLeads = [];
+      
+      for (const lead of leads) {
+        const phone = lead.phone || lead.contact_number;
+        const projectName = lead.interestedProject || lead.project_name || 'no-project';
+        
+        if (!phone) {
+          // Keep leads without phone numbers
+          uniqueLeads.push(lead);
+        } else {
+          // Create unique key for project-phone combination
+          const projectPhoneKey = `${projectName}_${phone.replace(/[^0-9]/g, '')}`;
+          
+          if (!seenProjectPhones.has(projectPhoneKey)) {
+            // First occurrence of this phone number in this project
+            seenProjectPhones.add(projectPhoneKey);
+            uniqueLeads.push(lead);
+          } else {
+            // Duplicate within same project - track for logging
+            removedLeads.push({
+              phone: phone,
+              project: projectName,
+              reason: `Duplicate phone number within project "${projectName}"`
+            });
+          }
+        }
+      }
+      
+      // Log removed duplicates
+      if (removedLeads.length > 0) {
+        console.log(`⚠️ Removed ${removedLeads.length} duplicate leads within same projects:`);
+        removedLeads.forEach((removed, index) => {
+          console.log(`  ${index + 1}. Phone: ${removed.phone} - Project: ${removed.project}`);
+        });
+      }
+      
+      const leadsData = uniqueLeads.map(lead => transformLeadToBackend(lead, clientId));
       
       // Validate all project names if provided
       for (const leadData of leadsData) {
@@ -152,6 +203,27 @@ const leadController = {
         data: {
           ...result.data,
           leads: transformedLeads
+        },
+        validation: {
+          // Combine CSV and database validation info
+          totalUploaded: leads.length,
+          csvDuplicatesRemoved: removedLeads.length,
+          csvDuplicateDetails: removedLeads.length > 0 ? removedLeads : undefined,
+          
+          // Database validation info from service
+          totalProcessedForDatabase: uniqueLeads.length,
+          databaseDuplicatesSkipped: result.validation?.skippedCount || 0,
+          databaseDuplicateDetails: result.validation?.skippedLeads || undefined,
+          
+          // Overall summary
+          summary: {
+            totalUploaded: leads.length,
+            csvDuplicatesRemoved: removedLeads.length,
+            sentToDatabase: uniqueLeads.length,
+            successfullySaved: result.data.created,
+            databaseDuplicatesSkipped: result.validation?.skippedCount || 0,
+            finalMessage: `${result.data.created} leads saved successfully. ${removedLeads.length} CSV duplicates and ${result.validation?.skippedCount || 0} database duplicates were skipped.`
+          }
         }
       });
     } catch (error) {
@@ -173,7 +245,6 @@ const leadController = {
         page: req.query.page,
         limit: req.query.limit,
         search: req.query.search,
-        status: req.query.status,
         leadType: req.query.leadType
       };
 
@@ -261,10 +332,14 @@ const leadController = {
   // Delete lead
   async delete(req, res) {
     try {
+      console.log('🎯 Lead Controller Delete - Called');
+      console.log('📋 Params:', req.params);
+      console.log('👤 User:', req.user?.id);
+      
       const { id } = req.params;
       const clientId = req.user?.id;
       
-      const result = await leadService.deleteLead(id, clientId);
+      const result = await leadService.deleteLead(id,clientId);
 
       res.status(200).json(result);
     } catch (error) {

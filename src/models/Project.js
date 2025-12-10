@@ -9,8 +9,8 @@ const projectSchema = new mongoose.Schema({
   },
   projectStatus: {
     type: String,
-    enum: ['planning', 'in-progress', 'on-hold', 'completed', 'cancelled'],
-    default: 'planning'
+    enum: ['draft', 'planning', 'in-progress', 'testing', 'on-hold', 'completed', 'cancelled'],
+    default: 'draft'
   },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -22,10 +22,20 @@ const projectSchema = new mongoose.Schema({
     ref: 'PhoneNumber',
     default: null
   },
+  phoneNumber: {
+    type: String,
+    default: null,
+    trim: true
+  },
   assistantId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Assistant',
-    default: null
+    required: [true, 'Assistant is required for the project']
+  },
+  assistantName: {
+    type: String,
+    default: null,
+    trim: true
   }
 }, {
   timestamps: true // This adds createdAt and updatedAt automatically

@@ -48,11 +48,6 @@ const leadValidation = [
     .trim()
     .isLength({ max: 500 })
     .withMessage('Notes must be less than 500 characters'),
-  
-  body('status')
-    .optional()
-    .isIn(['new', 'old'])
-    .withMessage('Status must be one of: new, old'),
 ];
 
 // Bulk lead validation
@@ -89,11 +84,6 @@ const bulkLeadValidation = [
     .optional()
     .isIn(['fake', 'cold', 'hot'])
     .withMessage('Lead type must be one of: fake, cold, hot'),
-  
-  body('leads.*.status')
-    .optional()
-    .isIn(['new', 'old'])
-    .withMessage('Status must be one of: new, old'),
 ];
 
 // Update lead validation (more flexible)
@@ -126,11 +116,6 @@ const updateLeadValidation = [
     .optional()
     .isIn(['fake', 'cold', 'hot'])
     .withMessage('Lead type must be one of: fake, cold, hot'),
-  
-  body('status')
-    .optional()
-    .isIn(['new', 'old'])
-    .withMessage('Status must be one of: new, old'),
 ];
 
 // Handle validation errors middleware

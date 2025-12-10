@@ -10,7 +10,7 @@ const createProjectValidation = [
     
   body('projectStatus')
     .optional()
-    .isIn(['planning', 'in-progress', 'on-hold', 'completed', 'cancelled'])
+    .isIn(['planning', 'in-progress', 'on-hold', 'completed', 'cancelled', 'testing', 'draft'])
     .withMessage('Invalid status value'),
 
   body('phoneNumberId')
@@ -20,9 +20,22 @@ const createProjectValidation = [
     .withMessage('Invalid phone number ID'),
 
   body('assistantId')
-    .optional()
+    .notEmpty()
+    .withMessage('Assistant is required')
     .isMongoId()
-    .withMessage('Invalid assistant ID')
+    .withMessage('Invalid assistant ID'),
+
+  body('assistantName')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('Assistant name cannot exceed 100 characters'),
+
+  body('phoneNumber')
+    .optional()
+    .trim()
+    .isLength({ max: 20 })
+    .withMessage('Phone number cannot exceed 20 characters')
 ];
 
 const updateProjectValidation = [
@@ -34,7 +47,7 @@ const updateProjectValidation = [
     
   body('projectStatus')
     .optional()
-    .isIn(['planning', 'in-progress', 'on-hold', 'completed', 'cancelled'])
+    .isIn(['planning', 'in-progress', 'on-hold', 'completed', 'cancelled', 'testing', 'draft'])
     .withMessage('Invalid status value'),
 
   body('phoneNumberId')
@@ -45,7 +58,19 @@ const updateProjectValidation = [
   body('assistantId')
     .optional()
     .isMongoId()
-    .withMessage('Invalid assistant ID')
+    .withMessage('Invalid assistant ID'),
+
+  body('assistantName')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('Assistant name cannot exceed 100 characters'),
+
+  body('phoneNumber')
+    .optional()
+    .trim()
+    .isLength({ max: 20 })
+    .withMessage('Phone number cannot exceed 20 characters')
 ];
 
 module.exports = {

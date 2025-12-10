@@ -42,9 +42,12 @@ router.put('/:id', updateLeadValidation, handleValidationErrors, (req, res) =>
   leadController.update(req, res)
 );
 
-// Delete lead (soft delete)
-router.delete('/:id', (req, res) => 
-  leadController.delete(req, res)
-);
+// Delete lead (soft delete) - using /delete endpoint
+router.delete('/delete/:id', (req, res) => {
+  console.log('🗑️ DELETE Route Hit - Lead ID:', req.params.id);
+  console.log('🌐 Method:', req.method, 'URL:', req.originalUrl);
+  leadController.delete(req, res);
+});
+
 
 module.exports = router;

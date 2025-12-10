@@ -19,7 +19,7 @@ const leadSchema = new mongoose.Schema(
     },
     call_status: {
       type: String,
-      enum: ['pending', 'connected', 'not_connected', 'callback', 'completed', 'scheduled', 'busy'],
+      enum: ['pending', 'initiating', 'ringing', 'in_progress', 'completed', 'no_answer', 'failed', 'voicemail', 'busy', 'cancelled'],
       default: 'pending',
     },
     lead_type: {
@@ -45,6 +45,27 @@ const leadSchema = new mongoose.Schema(
     call_attempt_count: {
       type: Number,
       default: 0,
+    },
+    // Maximum retry attempts allowed
+    max_retry_attempts: {
+      type: Number,
+      default: 3,
+    },
+    // Call disposition after the call
+    call_disposition: {
+      type: String,
+      enum: ['interested', 'not_interested', 'site_visit_scheduled', 'callback_requested', 'wrong_number', 'language_barrier', 'voicemail', 'no_answer'],
+      default: null,
+    },
+    // Last time a call was attempted
+    last_call_attempt_time: {
+      type: Date,
+      default: null,
+    },
+    // Next scheduled call time
+    next_scheduled_call_time: {
+      type: Date,
+      default: null,
     },
     // Track when auto-call last attempted (for debugging)
     last_auto_call_attempt: {

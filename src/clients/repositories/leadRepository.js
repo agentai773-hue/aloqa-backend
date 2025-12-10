@@ -27,7 +27,6 @@ class LeadRepository {
         page = 1, 
         limit = 10, 
         search = '', 
-        status = '', 
         leadType = '',
         userId 
       } = filters;
@@ -38,11 +37,6 @@ class LeadRepository {
       // Add user filter
       if (userId) {
         query.user_id = userId;
-      }
-
-      // Add status filter (map to call_status)
-      if (status) {
-        query.call_status = status;
       }
 
       // Add lead type filter
@@ -176,6 +170,42 @@ class LeadRepository {
       return statsObj;
     } catch (error) {
       throw new Error(`Failed to get lead statistics: ${error.message}`);
+    }
+  }
+
+  // Find leads by phone numbers for duplicate checking
+  async findByPhoneNumbers(userId, phoneNumbers) {
+    try {
+      return await Lead.find({
+        user_id: userId,
+        contact_number: { $in: phoneNumbers },
+        deleted_at: null
+      }).select('contact_number');
+    } catch (error) {
+      throw new Error(`Failed to find leads by phone numbers: ${error.message}`);
+    }
+  }
+
+  // Find leads by phone numbers within specific projects for duplicate checking
+  async findByPhoneNumbersAndProject(userId, phoneProjectPairs) {
+    try {
+      // Build query for phone-project combinations
+      const orConditions = phoneProjectPairs.map(pair => ({
+        user_id: userId,
+        contact_number: pair.phone,
+        project_name: pair.project,
+        deleted_at: null
+      }));
+
+      if (orConditions.length === 0) {
+        return [];
+      }
+
+      return await Lead.find({
+        $or: orConditions
+      }).select('contact_number project_name');
+    } catch (error) {
+      throw new Error(`Failed to find leads by phone numbers and project: ${error.message}`);
     }
   }
 }
