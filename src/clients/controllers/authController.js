@@ -20,8 +20,6 @@ async function login(req, res) {
       path: '/', // Available across all paths
     };
     
-    console.log('✅ Login successful for user:', email);
-    console.log('🍪 Cookie settings:', { secure: cookieOptions.secure, sameSite: cookieOptions.sameSite });
     res.cookie('token', token, cookieOptions);
     
     res.status(200).json({ 
@@ -52,7 +50,6 @@ async function logout(req, res) {
       path: '/',
     });
     
-    console.log('✅ Logout successful');
     res.status(200).json({ 
       success: true,
       message: 'Logged out successfully' 
@@ -125,7 +122,6 @@ async function verify(req, res) {
       bearerToken: user.bearerToken
     };
 
-    console.log('✅ Token verified for user:', user.email);
     res.status(200).json({ 
       success: true,
       token, 

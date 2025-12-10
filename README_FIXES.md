@@ -16,7 +16,6 @@
 **Fixed in**: `callHistoryService.js`
 ```javascript
 // NOW: Proper logging shows success/failure
-console.log(`✅ CallHistory created successfully: ${historyRecord._id}`);
 console.error('❌ CRITICAL: Failed to save call history:', historyError.message);
 ```
 
@@ -32,7 +31,6 @@ console.error('❌ CRITICAL: Failed to save call history:', historyError.message
 ```javascript
 // NOW: Proper error handling with better logging
 const updatedLead = await this.repository.updateLeadCallStatus(leadId, 'connected');
-console.log(`✅ Lead ${leadId} status updated to "connected"`);
 
 // AND in transcript analysis:
 call_status: analysis.leadType === 'not_interested' || analysis.leadType === 'fake' 
@@ -50,10 +48,7 @@ call_status: analysis.leadType === 'not_interested' || analysis.leadType === 'fa
 **Fixed in**: `callHistoryController.js`
 ```javascript
 // NOW: Ultra-clear logging when webhook arrives
-console.log('\n📍📍📍 WEBHOOK RECEIVED FROM BOLNA 📍📍📍');
-console.log('Full webhook payload:', JSON.stringify(webhookData, null, 2));
-console.log(`✅ Call history updated with webhook - ID: ${updatedCall?._id}`);
-```
+
 
 ---
 

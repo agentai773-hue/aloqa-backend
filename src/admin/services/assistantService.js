@@ -38,13 +38,11 @@ class AssistantService {
   processSynthesizerConfigForDB(synthesizerConfig) {
     const config = { ...synthesizerConfig };
     
-    console.log('💾 Processing synthesizer config for database:', JSON.stringify(synthesizerConfig, null, 2));
     
     // Handle ElevenLabs Provider - Remove engine field but keep voice name
     if (config.provider === 'elevenlabs' && config.provider_config) {
       const providerConfig = { ...config.provider_config };
       
-      console.log('💾 ElevenLabs Database Config - Cleaning fields');
       
       // Remove Polly-specific fields for ElevenLabs
       delete providerConfig.engine;  // Engine is only for Polly, not ElevenLabs
@@ -67,12 +65,7 @@ class AssistantService {
         providerConfig.sampling_rate = String(providerConfig.sampling_rate);
       }
       
-      console.log('✅ ElevenLabs Database Config (engine removed, voice name preserved):');
-      console.log('- Provider:', config.provider);
-      console.log('- Voice Name (for DB):', providerConfig.voice);
-      console.log('- Voice ID (for DB):', providerConfig.voice_id);
-      console.log('- Model:', providerConfig.model);
-      console.log('- Engine field removed for database');
+     
       
       config.provider_config = providerConfig;
     }
@@ -81,7 +74,6 @@ class AssistantService {
     else if (config.provider === 'polly' && config.provider_config) {
       const providerConfig = { ...config.provider_config };
       
-      console.log('💾 Polly Database Config - Cleaning fields');
       
       // For Polly, remove ElevenLabs specific fields
       delete providerConfig.voice_id;
@@ -101,11 +93,7 @@ class AssistantService {
       if (providerConfig.sampling_rate) {
         providerConfig.sampling_rate = String(providerConfig.sampling_rate);
       }
-      
-      console.log('✅ Polly Database Config (voice_id removed, engine preserved):');
-      console.log('- Provider:', config.provider);
-      console.log('- Voice:', providerConfig.voice);
-      console.log('- Engine:', providerConfig.engine);
+
       
       config.provider_config = providerConfig;
     }
@@ -115,13 +103,11 @@ class AssistantService {
   processSynthesizerConfig(synthesizerConfig) {
     const config = { ...synthesizerConfig };
     
-    console.log('🔧 Processing synthesizer config:', JSON.stringify(synthesizerConfig, null, 2));
     
     // Handle Manual Selection (Polly Provider)
     if (config.provider === 'polly' && config.provider_config) {
       const providerConfig = { ...config.provider_config };
       
-      console.log('🎯 Manual Selection Mode - Polly Provider');
       
       // For Polly, remove ElevenLabs specific fields
       delete providerConfig.voice_id;
@@ -142,10 +128,7 @@ class AssistantService {
         providerConfig.sampling_rate = String(providerConfig.sampling_rate);
       }
       
-      console.log('✅ Polly Configuration (Without voice_id):');
-      console.log('- Provider:', config.provider);
-      console.log('- Voice:', providerConfig.voice);
-      console.log('- Engine:', providerConfig.engine);
+
       
       config.provider_config = providerConfig;
     }
@@ -154,7 +137,6 @@ class AssistantService {
     else if (config.provider === 'elevenlabs' && config.provider_config) {
       const providerConfig = { ...config.provider_config };
       
-      console.log('🎯 Dynamic Selection Mode - ElevenLabs Provider');
       
       // Clean voice_id field if it has elevenlabs- prefix
       if (providerConfig.voice_id && providerConfig.voice_id.startsWith('elevenlabs-')) {
@@ -174,19 +156,8 @@ class AssistantService {
         
         // Use voice_id as the voice field value (this is what Bolna expects)
         providerConfig.voice = providerConfig.voice_id;
-        console.log('🔄 Using voice_id as voice field for Bolna compatibility');
-        console.log('- Original voice name:', originalVoiceName || 'N/A');
-        console.log('- Using voice_id as voice:', providerConfig.voice_id);
-      } else if (providerConfig.voice && providerConfig.voice.length > 15) {
-        // If voice field looks like a voice ID (long string), keep it as is
-        console.log('🔄 Voice field appears to be voice ID, keeping as is');
-        console.log('- Voice field (voice ID):', providerConfig.voice);
-      } else {
-        // Fallback: voice name without voice_id - this might fail with Bolna
-        console.log('⚠️ Warning: No voice_id provided for ElevenLabs, using voice name');
-        console.log('- Voice name:', providerConfig.voice);
-        console.log('- This might fail with Bolna API - voice_id is preferred');
-      }
+      
+      } 
       
       // Remove Polly-specific fields for ElevenLabs
       delete providerConfig.engine;  // Engine is only for Polly, not ElevenLabs
@@ -200,14 +171,7 @@ class AssistantService {
       if (providerConfig.sampling_rate) {
         providerConfig.sampling_rate = String(providerConfig.sampling_rate);
       }
-      
-      console.log('✅ ElevenLabs Configuration (voice field = voice_id):');
-      console.log('- Provider:', config.provider);
-      console.log('- Voice field (sent to Bolna):', providerConfig.voice);
-      console.log('- Voice ID field:', providerConfig.voice_id);
-      console.log('- Model:', providerConfig.model);
-      console.log('- Engine field removed (ElevenLabs does not use engine)');
-      console.log('- IMPORTANT: voice field = voice_id for Bolna compatibility');
+ 
       
       config.provider_config = providerConfig;
     }
@@ -232,7 +196,7 @@ class AssistantService {
     else if (config.provider_config) {
       const providerConfig = { ...config.provider_config };
       
-      console.log('🎯 Other Provider Configuration');
+    
       
       // Remove ElevenLabs specific fields for other providers
       delete providerConfig.voice_id;
@@ -243,9 +207,7 @@ class AssistantService {
         providerConfig.sampling_rate = String(providerConfig.sampling_rate);
       }
       
-      console.log('✅ Other Provider Configuration (Clean):');
-      console.log('- Provider:', config.provider);
-      console.log('- Config:', JSON.stringify(providerConfig, null, 2));
+   
       
       config.provider_config = providerConfig;
     }
@@ -276,31 +238,8 @@ class AssistantService {
     // Process synthesizer config to ensure proper voice handling
     const processedSynthesizerConfig = this.processSynthesizerConfig(assistantData.synthesizerConfig);
     
-    // Log voice configuration for debugging
-    console.log('🎤 Voice Configuration Debug:');
-    console.log('Original from frontend:', JSON.stringify(assistantData.synthesizerConfig, null, 2));
-    console.log('Processed by backend:', JSON.stringify(processedSynthesizerConfig, null, 2));
-    
-    // Provider-specific logging
-    if (processedSynthesizerConfig.provider === 'elevenlabs') {
-      console.log('🚀 ElevenLabs (Dynamic Mode) - voice field contains voice_id:');
-      console.log('- Voice field (sent to Bolna):', processedSynthesizerConfig.provider_config.voice);
-      console.log('- Voice ID field:', processedSynthesizerConfig.provider_config.voice_id);
-      console.log('- Model:', processedSynthesizerConfig.provider_config.model);
-      console.log('- IMPORTANT: voice field = voice_id for Bolna compatibility');
-    } else if (processedSynthesizerConfig.provider === 'polly') {
-      console.log('🎯 Polly (Manual Mode) - WITHOUT voice_id:');
-      console.log('- Voice Name:', processedSynthesizerConfig.provider_config.voice);
-      console.log('- Engine:', processedSynthesizerConfig.provider_config.engine);
-      console.log('- No voice_id field (as expected)');
-    }
-console.log(processedSynthesizerConfig  ,"Final Config for Bolna")
-    
-    // Log detailed synthesizer config that will be sent to Bolna
-    console.log('🔧 Final Synthesizer Config for Bolna API:');
-    console.log('Provider:', processedSynthesizerConfig.provider);
-    console.log('Provider Config:', JSON.stringify(processedSynthesizerConfig.provider_config, null, 2));
-    
+
+  
     // Build Bolna API v2 payload - use exact values from frontend
     const bolnaPayload = {
       agent_config: {
@@ -362,9 +301,7 @@ console.log(processedSynthesizerConfig  ,"Final Config for Bolna")
       }
     };
 
-    // Log complete Bolna API payload for debugging
-    console.log('🚀 Complete Bolna API Payload:');
-    console.log(JSON.stringify(bolnaPayload, null, 2));
+
 
     const response = await axios.post(
       `${BOLNA_API_URL}/v2/agent`,

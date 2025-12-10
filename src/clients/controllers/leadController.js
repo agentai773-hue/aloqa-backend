@@ -64,26 +64,58 @@ const validateProjectName = async (projectName, clientId) => {
 };
 
 const leadController = {
+  // Helper: Validate request and extract client ID
+  _validateRequest(req, res) {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      res.status(400).json({
+        success: false,
+        message: 'Validation errors',
+        errors: errors.array()
+      });
+      return null;
+    }
+
+    const clientId = req.user?.id;
+    if (!clientId) {
+      res.status(401).json({
+        success: false,
+        message: 'User authentication required'
+      });
+      return null;
+    }
+
+    return clientId;
+  },
+
+  // Helper: Handle errors with proper status codes
+  _handleError(error, res) {
+    console.error('Lead Controller Error:', error);
+    
+    let statusCode = 500;
+    if (error.message.includes('already exists')) {
+      statusCode = 409; // Conflict
+    } else if (error.message.includes('required') || error.message.includes('invalid')) {
+      statusCode = 400; // Bad Request
+    } else if (error.message.includes('not found')) {
+      statusCode = 404; // Not Found
+    }
+    
+    res.status(statusCode).json({
+      success: false,
+      message: error.message || 'Operation failed',
+      error: error.message
+    });
+  },
+
   // Create single lead
   async create(req, res) {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          message: 'Validation errors',
-          errors: errors.array()
-        });
-      }
+      // Validate request and get client ID
+      const clientId = this._validateRequest(req, res);
+      if (!clientId) return; // Response already sent
 
-      const clientId = req.user?.id;
-      if (!clientId) {
-        return res.status(401).json({
-          success: false,
-          message: 'User authentication required'
-        });
-      }
-
+      // Transform and validate lead data
       const leadData = transformLeadToBackend(req.body, clientId);
       
       // Validate project name if provided
@@ -97,22 +129,18 @@ const leadController = {
         }
       }
       
+      // Create lead through service
       const result = await leadService.createLead(clientId, leadData);
       
-      // Transform the response data
+      // Transform and send response
       const transformedLead = transformLeadToFrontend(result.data);
-
       res.status(201).json({
         ...result,
         data: transformedLead
       });
+      
     } catch (error) {
-      console.error('Create lead error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to create lead',
-        error: error.message
-      });
+      this._handleError(error, res);
     }
   },
 
@@ -169,13 +197,7 @@ const leadController = {
         }
       }
       
-      // Log removed duplicates
-      if (removedLeads.length > 0) {
-        console.log(`⚠️ Removed ${removedLeads.length} duplicate leads within same projects:`);
-        removedLeads.forEach((removed, index) => {
-          console.log(`  ${index + 1}. Phone: ${removed.phone} - Project: ${removed.project}`);
-        });
-      }
+  
       
       const leadsData = uniqueLeads.map(lead => transformLeadToBackend(lead, clientId));
       
@@ -332,9 +354,7 @@ const leadController = {
   // Delete lead
   async delete(req, res) {
     try {
-      console.log('🎯 Lead Controller Delete - Called');
-      console.log('📋 Params:', req.params);
-      console.log('👤 User:', req.user?.id);
+
       
       const { id } = req.params;
       const clientId = req.user?.id;

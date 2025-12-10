@@ -4,8 +4,8 @@ const leadSchema = new mongoose.Schema(
   {
     full_name: {
       type: String,
+      required: [true, 'Full name is required'],
       trim: true,
-      sparse: true,
     },
     user_id: {
       type: mongoose.Schema.Types.ObjectId,
@@ -14,8 +14,23 @@ const leadSchema = new mongoose.Schema(
     },
     contact_number: {
       type: String,
+      required: [true, 'Contact number is required'],
       trim: true,
-      sparse: true,
+    },
+    email: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    location: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    notes: {
+      type: String,
+      trim: true,
+      default: '',
     },
     call_status: {
       type: String,
@@ -25,10 +40,11 @@ const leadSchema = new mongoose.Schema(
     lead_type: {
       type: String,
       enum: ['pending', 'hot', 'cold', 'fake', 'connected', 'not_interested'],
+      default: 'cold',
     },
     project_name: {
       type: String,
-      // Remove complex validation for now - we'll validate in controller
+      required: [true, 'Project name is required'],
       trim: true
     },
     // Scheduled call time - next time this lead should be called

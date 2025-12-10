@@ -13,7 +13,7 @@ const clientAuthMiddleware = require('../../middleware/clientMiddleware');
 router.use(clientAuthMiddleware);
 
 // Create single lead
-router.post('/', leadValidation, handleValidationErrors, (req, res) => 
+router.post('/create', leadValidation, handleValidationErrors, (req, res) => 
   leadController.create(req, res)
 );
 
@@ -44,8 +44,7 @@ router.put('/:id', updateLeadValidation, handleValidationErrors, (req, res) =>
 
 // Delete lead (soft delete) - using /delete endpoint
 router.delete('/delete/:id', (req, res) => {
-  console.log('🗑️ DELETE Route Hit - Lead ID:', req.params.id);
-  console.log('🌐 Method:', req.method, 'URL:', req.originalUrl);
+ 
   leadController.delete(req, res);
 });
 

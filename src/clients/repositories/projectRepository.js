@@ -28,9 +28,7 @@ class ProjectRepository {
       // Calculate skip
       const skip = (page - 1) * limit;
       
-      // Debug: Log query and pagination params
-      console.log('Project Repository - Query:', JSON.stringify(query));
-      console.log('Project Repository - Pagination:', { page, limit, skip });
+
       
       // Execute queries in parallel
       const [projects, total] = await Promise.all([
@@ -44,9 +42,7 @@ class ProjectRepository {
         Project.countDocuments(query)
       ]);
       
-      // Debug: Log the results
-      console.log('Project Repository - Found projects:', projects.length);
-      console.log('Project Repository - Total count:', total);
+   
       
       return {
         projects,

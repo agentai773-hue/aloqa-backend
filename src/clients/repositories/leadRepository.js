@@ -7,7 +7,10 @@ class LeadRepository {
       const lead = new Lead(leadData);
       return await lead.save();
     } catch (error) {
-      throw new Error(`Failed to create lead: ${error.message}`);
+      if (error.code === 11000) {
+        throw new Error('Lead with this phone number already exists');
+      }
+      throw new Error(error.message);
     }
   }
 
@@ -16,7 +19,7 @@ class LeadRepository {
     try {
       return await Lead.insertMany(leadsData, { ordered: false });
     } catch (error) {
-      throw new Error(`Failed to create leads: ${error.message}`);
+      throw new Error(error.message);
     }
   }
 

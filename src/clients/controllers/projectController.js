@@ -13,15 +13,11 @@ class ProjectController {
         status: req.query.status
       };
 
-      // Debug: Log the request to see what's happening
-      console.log('Projects Controller - Client ID:', clientId);
-      console.log('Projects Controller - Filters:', filters);
+
 
       const result = await projectService.getAllProjects(clientId, filters);
       
-      // Debug: Log the result before sending response
-      console.log('Projects Controller - Result pagination:', result.pagination);
-      console.log('Projects Controller - Result data length:', result.data?.length);
+
       
       res.status(200).json(result);
     } catch (error) {
@@ -54,7 +50,6 @@ class ProjectController {
 
   // Create new project
   async createProject(req, res) {
-    console.log(req,"ahdasdhaskjdhjaks");
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {

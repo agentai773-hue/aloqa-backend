@@ -21,7 +21,7 @@ const leadValidation = [
     .withMessage('Please provide a valid phone number'),
   
   body('email')
-    .optional()
+    .optional({ values: 'falsy' })
     .isEmail()
     .normalizeEmail()
     .withMessage('Please provide a valid email address'),
@@ -75,7 +75,7 @@ const bulkLeadValidation = [
     .withMessage('Please provide a valid phone number'),
   
   body('leads.*.email')
-    .optional()
+    .optional({ values: 'falsy' })
     .isEmail()
     .normalizeEmail()
     .withMessage('Please provide a valid email address'),
@@ -107,7 +107,7 @@ const updateLeadValidation = [
     .withMessage('Please provide a valid phone number'),
   
   body('email')
-    .optional()
+    .optional({ values: 'falsy' })
     .isEmail()
     .normalizeEmail()
     .withMessage('Please provide a valid email address'),

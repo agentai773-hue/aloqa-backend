@@ -14,34 +14,10 @@ const routes = require('./src/routes');
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// ==================== Model Loading ====================
-function loadModels() {
-  console.log('📦 Loading Models...');
-  
-  // Admin Models
-  require('./src/models/Admin');
-  require('./src/models/Assistant');
-  require('./src/models/PhoneNumber');
-  require('./src/models/AssignUserVoice');
-  
-  // Client Models  
-  require('./src/models/User');
-  require('./src/models/Lead');
-  require('./src/models/Project');
-  
-  console.log('✅ All models loaded successfully');
-}
 
-// ==================== Startup ====================
-console.log('🚀 Initializing Aloqa AI Admin System...');
-console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
-console.log(`🔗 Port: ${PORT}`);
 
-// Load models
-loadModels();
 
-// Connect to MongoDB
-console.log('🔗 Connecting to MongoDB...');
+
 connectDB();
 
 // ==================== CORS Configuration ====================
@@ -143,39 +119,16 @@ app.use('*', (req, res) => {
 
 // ==================== Server Startup ====================
 app.listen(PORT, '0.0.0.0', () => {
-  console.log('');
+
   console.log('🎉 Aloqa AI System Started Successfully!');
-  console.log('================================================');
-  console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🌐 Server URL: http://localhost:${PORT}`);
-  console.log('');
-  console.log('📋 Available Endpoints:');
-  console.log('  🏠 Main Health: /health');
-  console.log('  ⚕️  API Health: /api/health');
-  console.log('');
-  console.log('  🔐 Admin API: /api/admin/*');
-  console.log('    ├── Health: /api/admin/health');
-  console.log('    ├── Auth: /api/admin/auth');
-  console.log('    ├── Users: /api/admin/users');
-  console.log('    ├── Assistants: /api/admin/assistants');
-  console.log('    ├── Phone Numbers: /api/admin/phone-numbers');
-  console.log('    ├── Voices: /api/admin/voices');
-  console.log('    └── Assign User Voice: /api/admin/assign-user-voice');
-  console.log('');
-  console.log('  👤 Client API: /api/client/*');
-  console.log('    ├── Auth: /api/client/auth');
-  console.log('    ├── Projects: /api/client/projects');
-  console.log('    └── Leads: /api/client/leads');
-  console.log('');
-  console.log('✅ Full system ready!');
-  console.log('================================================');
-  console.log('');
+
+
 });
 
 // ==================== Graceful Shutdown ====================
 process.on('SIGINT', () => {
   console.log('\n🛑 Shutting down gracefully...');
-  console.log('👋 Goodbye!');
+
   process.exit(0);
 });
 

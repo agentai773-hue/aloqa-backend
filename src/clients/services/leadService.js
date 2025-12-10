@@ -1,4 +1,5 @@
 const leadRepository = require('../repositories/leadRepository');
+const singleCallLeadService = require('../callService/singleCallLead');
 
 class LeadService {
   // Get all leads for a client with filtering
@@ -62,28 +63,96 @@ class LeadService {
   }
 
   // Create new lead
+  // Validate client ID
+  _validateClientId(clientId) {
+    if (!clientId) {
+      throw new Error('Client ID is required');
+    }
+  }
+
+  // Check for duplicate phone number within same project
+  async _checkDuplicatePhone(clientId, phone, project) {
+    if (phone && phone.trim() !== '' && project && project.trim() !== '') {
+      const phoneProjectPairs = [{
+        phone: phone.trim(),
+        project: project.trim()
+      }];
+      const existingLeads = await leadRepository.findByPhoneNumbersAndProject(clientId, phoneProjectPairs);
+      if (existingLeads.length > 0) {
+        throw new Error(`A lead with phone number ${phone} already exists in project "${project}"`);
+      }
+    }
+  }
+
+  // Prepare lead data for creation
+  _prepareLead(leadData, clientId) {
+    return {
+      ...leadData,
+      user_id: clientId
+    };
+  }
+
+  // Create single lead
   async createLead(clientId, leadData) {
     try {
-      if (!clientId) {
-        throw new Error('Client ID is required');
-      }
+      // Validate inputs
+      this._validateClientId(clientId);
+      
+      // Check for duplicates
+      await this._checkDuplicatePhone(
+        clientId, 
+        leadData.contact_number, 
+        leadData.project_name
+      );
 
-      // Check for duplicate phone number if provided
-      const phone = leadData.contact_number;
-      if (phone && phone.trim() !== '') {
-        const existingLead = await leadRepository.findByPhoneNumbers(clientId, [phone]);
-        if (existingLead.length > 0) {
-          throw new Error('A lead with this phone number already exists');
-        }
-      }
-
-      // Prepare lead data with userId
-      const newLeadData = {
-        ...leadData,
-        user_id: clientId
-      };
-
+      // Prepare and create lead FIRST
+      const newLeadData = this._prepareLead(leadData, clientId);
       const lead = await leadRepository.create(newLeadData);
+      
+
+      
+      // NOW make call automatically after successful database save
+      if (leadData.contact_number && leadData.project_name) {
+        
+        // Prepare frontend format for call service
+        const frontendLeadData = {
+          leadName: leadData.full_name || '',
+          fullName: leadData.full_name || '',
+          phone: leadData.contact_number || '',
+          interestedProject: leadData.project_name || '',
+          leadType: leadData.lead_type || 'cold',
+          location: '',
+          email: '',
+          notes: ''
+        };
+        
+        // Process call in background - don't block response
+        singleCallLeadService.processLeadCall(clientId, frontendLeadData)
+          .then(callResult => {
+            if (callResult.success) {
+              console.log('✅ Automatic call initiated successfully:', {
+                lead_name: frontendLeadData.leadName,
+                call_id: callResult.data?.call_result?.call_id,
+                status: callResult.data?.call_result?.call_status
+              });
+            } else {
+              console.error('❌ Failed to initiate automatic call:', {
+                lead_name: frontendLeadData.leadName,
+                error_message: callResult.message,
+                error_details: callResult.error
+              });
+            }
+          })
+          .catch(error => {
+            console.error('❌ Error in automatic call process:', {
+              lead_name: frontendLeadData.leadName,
+              error_message: error.message,
+              stack: error.stack
+            });
+          });
+      } else {
+        console.log('⚠️ Skipping call - missing phone number or project after database save');
+      }
       
       return {
         success: true,
@@ -91,7 +160,7 @@ class LeadService {
         data: lead
       };
     } catch (error) {
-      throw new Error(`Service error: ${error.message}`);
+      throw new Error(error.message);
     }
   }
 
