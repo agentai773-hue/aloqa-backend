@@ -1,6 +1,19 @@
 const { bolnaAPI, BOLNA_CONFIG } = require('./bolnaConfig');
 const projectRepository = require('../repositories/projectRepository');
 
+// Helper function to get ordinal suffix for dates
+function getOrdinalSuffix(day) {
+  if (day >= 11 && day <= 13) {
+    return 'th';
+  }
+  switch (day % 10) {
+    case 1: return 'st';
+    case 2: return 'nd';
+    case 3: return 'rd';
+    default: return 'th';
+  }
+}
+
 class SingleCallLeadService {
   
   // Get project data by project name and client ID
@@ -65,15 +78,26 @@ class SingleCallLeadService {
         throw new Error('Valid project phone number is required');
       }
 
+      // Get current date for last contacted
+      const now = new Date();
+      const day = now.getDate();
+      const month = now.toLocaleDateString('en-US', { month: 'long' });
+      const currentDate = `${day}${getOrdinalSuffix(day)} ${month}`;
+
       // Prepare call payload according to Bolna.ai API documentation
       const callPayload = {
         agent_id: projectData.assistantId.agentId,
         recipient_phone_number: recipientPhone,
         from_phone_number: fromPhone,
         user_data: {
-          // Lead information
+          // Main fields as per Bolna.ai format
+          customer_name: leadData.leadName || leadData.fullName || 'Unknown Customer',
+          last_contacted_on: currentDate,
+          product_name: leadData.interestedProject || projectData.projectName,
+          
+          // Additional custom fields
           lead_name: leadData.leadName || leadData.fullName || 'Unknown Lead',
-          full_name: leadData.fullName || leadData.leadName || 'Unknown Lead', 
+          full_name: leadData.fullName || leadData.leadName || 'Unknown Lead',
           phone_number: leadData.phone,
           project_name: leadData.interestedProject || projectData.projectName,
           lead_type: leadData.leadType || 'cold',
@@ -85,19 +109,16 @@ class SingleCallLeadService {
           
           // Project context
           assistant_name: projectData.assistantName || 'AI Assistant',
-          project_phone: projectData.phoneNumber
+          project_phone: projectData.phoneNumber,
+          agent_id: projectData.assistantId.agentId,
+          
+          // System fields
+          call_initiated_at: new Date().toISOString(),
+          lead_source: 'aloqa_system'
         }
       };
 
-      console.log('📋 Prepared Bolna.ai call payload:', {
-        agent_id: callPayload.agent_id,
-        recipient_phone_number: callPayload.recipient_phone_number,
-        from_phone_number: callPayload.from_phone_number,
-        lead_info: {
-          name: callPayload.user_data.lead_name,
-          project: callPayload.user_data.project_name
-        }
-      });
+ 
 
       return callPayload;
 
@@ -113,17 +134,11 @@ class SingleCallLeadService {
       console.log('📞 Making call to Bolna.ai...');
       
       const response = await bolnaAPI.post(BOLNA_CONFIG.ENDPOINTS.MAKE_CALL, callPayload);
-      
+      console.log(response,"response")
       if (response.data) {
         const { message, status, execution_id } = response.data;
         
-        console.log('✅ Call initiated successfully:', {
-          message,
-          status,
-          execution_id,
-          recipient: callPayload.recipient_phone_number,
-          agent_id: callPayload.agent_id
-        });
+    
         
         return {
           success: true,

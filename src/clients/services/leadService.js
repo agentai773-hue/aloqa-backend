@@ -130,11 +130,7 @@ class LeadService {
         singleCallLeadService.processLeadCall(clientId, frontendLeadData)
           .then(callResult => {
             if (callResult.success) {
-              console.log('✅ Automatic call initiated successfully:', {
-                lead_name: frontendLeadData.leadName,
-                call_id: callResult.data?.call_result?.call_id,
-                status: callResult.data?.call_result?.call_status
-              });
+              console.log('✅ Automatic call initiated successfully for lead:', frontendLeadData.leadName);
             } else {
               console.error('❌ Failed to initiate automatic call:', {
                 lead_name: frontendLeadData.leadName,
@@ -302,8 +298,6 @@ class LeadService {
         throw new Error('Lead ID and Client ID are required');
       }
 
-      console.log('🔍 Delete Lead Debug - Client ID:', clientId);
-      console.log('🔍 Delete Lead Debug - Lead ID:', leadId);
 
       // First verify lead belongs to client
       const existingLead = await leadRepository.getById(leadId);
