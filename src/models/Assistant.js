@@ -273,7 +273,7 @@ const assistantSchema = new mongoose.Schema({
     },
     interim_results: {
       type: Boolean,
-      default: true
+      default: false
     },
     punctuate: {
       type: Boolean,
