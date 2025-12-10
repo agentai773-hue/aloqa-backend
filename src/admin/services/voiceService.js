@@ -40,7 +40,7 @@ class VoiceService {
           voice_id: voice.voice_id,
           name: voice.name,
           provider: 'elevenlabs',
-          model: voice.high_quality_base_model_ids?.[0] || 'eleven_multilingual_v2',
+          model: voice.high_quality_base_model_ids?.[0] || 'eleven_flash_v2_5',
           accent: this.detectAccent(voice),
           category: voice.category || 'premade',
           description: voice.description || '',
