@@ -6,50 +6,52 @@ const { protect } = require('../../middleware/auth');
 // All routes require authentication
 router.use(protect);
 
+// ==================== ADMIN ASSISTANT MANAGEMENT API ENDPOINTS ====================
+
 /**
- * @route   POST /api/assistants
+ * @route   POST /api/admin/assistants/create
  * @desc    Create a new assistant
  * @access  Private (Admin only)
  */
-router.post('/', assistantController.createAssistant);
+router.post('/create', assistantController.createAssistant);
 
 /**
- * @route   GET /api/assistants
+ * @route   GET /api/admin/assistants/list
  * @desc    Get all assistants (with optional filters)
  * @access  Private (Admin only)
  */
-router.get('/', assistantController.getAllAssistants);
+router.get('/list', assistantController.getAllAssistants);
 
 /**
- * @route   GET /api/assistants/:id
+ * @route   GET /api/admin/assistants/get/:id
  * @desc    Get assistant by ID
  * @access  Private (Admin only)
  */
-router.get('/:id', assistantController.getAssistantById);
+router.get('/get/:id', assistantController.getAssistantById);
 
 /**
- * @route   PUT /api/assistants/:id
+ * @route   PUT /api/admin/assistants/update/:id
  * @desc    Update assistant (database only - legacy)
  * @access  Private (Admin only)
  */
-router.put('/:id', assistantController.updateAssistant);
+router.put('/update/:id', assistantController.updateAssistant);
 
 /**
- * @route   PATCH /api/assistants/:id
+ * @route   PATCH /api/admin/assistants/patch/:id
  * @desc    Patch update assistant (partial update to Bolna AI)
  * @access  Private (Admin only)
  */
-router.patch('/:id', assistantController.patchAssistant);
+router.patch('/patch/:id', assistantController.patchAssistant);
 
 /**
- * @route   DELETE /api/assistants/:id
+ * @route   DELETE /api/admin/assistants/delete/:id
  * @desc    Delete assistant (hard delete from DB + Bolna AI)
  * @access  Private (Admin only)
  */
-router.delete('/:id', assistantController.deleteAssistant);
+router.delete('/delete/:id', assistantController.deleteAssistant);
 
 /**
- * @route   GET /api/assistants/user/:userId
+ * @route   GET /api/admin/assistants/user/:userId
  * @desc    Get all assistants for a specific user
  * @access  Private (Admin only)
  */

@@ -7,51 +7,67 @@ const { protect } = require('../../middleware/auth');
 // Apply authentication middleware to all routes
 router.use(protect);
 
-// POST /admin/assign-user-voice - Assign voice to user
+// ==================== ADMIN USER VOICE ASSIGNMENT API ENDPOINTS ====================
+
+// @route   POST /api/admin/assign-user-voice/assign
+// @desc    Assign voice to user
+// @access  Private (Admin only)
 router.post(
-  '/',
+  '/assign',
   assignUserVoiceValidation.assignVoiceToUser,
   assignUserVoiceController.assignVoiceToUser
 );
 
-// GET /admin/assign-user-voice - Get all voice assignments with pagination and filters
+// @route   GET /api/admin/assign-user-voice/list
+// @desc    Get all voice assignments with pagination and filters
+// @access  Private (Admin only)
 router.get(
-  '/',
+  '/list',
   assignUserVoiceValidation.getAllAssignments,
   assignUserVoiceController.getAllAssignments
 );
 
-// GET /admin/assign-user-voice/user/:userId - Get assignments by user ID
+// @route   GET /api/admin/assign-user-voice/user/:userId
+// @desc    Get assignments by user ID
+// @access  Private (Admin only)
 router.get(
   '/user/:userId',
   assignUserVoiceValidation.getAssignmentsByUser,
   assignUserVoiceController.getAssignmentsByUser
 );
 
-// GET /admin/assign-user-voice/:id - Get single assignment by ID
+// @route   GET /api/admin/assign-user-voice/get/:id
+// @desc    Get single assignment by ID
+// @access  Private (Admin only)
 router.get(
-  '/:id',
+  '/get/:id',
   assignUserVoiceValidation.getAssignmentById,
   assignUserVoiceController.getAssignmentById
 );
 
-// PUT /admin/assign-user-voice/:id - Update assignment
+// @route   PUT /api/admin/assign-user-voice/update/:id
+// @desc    Update assignment
+// @access  Private (Admin only)
 router.put(
-  '/:id',
+  '/update/:id',
   assignUserVoiceValidation.updateAssignment,
   assignUserVoiceController.updateAssignment
 );
 
-// PATCH /admin/assign-user-voice/:id/status - Update assignment status
+// @route   PATCH /api/admin/assign-user-voice/:id/update-status
+// @desc    Update assignment status
+// @access  Private (Admin only)
 router.patch(
-  '/:id/status',
+  '/:id/update-status',
   assignUserVoiceValidation.updateAssignmentStatus,
   assignUserVoiceController.updateAssignmentStatus
 );
 
-// DELETE /admin/assign-user-voice/:id - Delete assignment (soft delete)
+// @route   DELETE /api/admin/assign-user-voice/delete/:id
+// @desc    Delete assignment (soft delete)
+// @access  Private (Admin only)
 router.delete(
-  '/:id',
+  '/delete/:id',
   assignUserVoiceValidation.deleteAssignment,
   assignUserVoiceController.deleteAssignment
 );

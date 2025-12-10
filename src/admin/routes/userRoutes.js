@@ -1,60 +1,59 @@
 const express = require('express');
-const { body } = require('express-validator');
 const userController = require('../controllers/userController');
 const { protect } = require('../../middleware/auth');
+const {
+  userCreationValidation,
+  userUpdateValidation,
+  userIdValidation,
+  userApprovalValidation,
+  emailVerificationValidation
+} = require('../../validators/admin/userValidator');
 
 const router = express.Router();
-
-// Validation rules
-const userValidation = [
-  body('firstName').trim().notEmpty().withMessage('First name is required'),
-  body('lastName').trim().notEmpty().withMessage('Last name is required'),
-  body('email').isEmail().withMessage('Valid email is required'),
-  body('mobile').matches(/^[0-9]{10,15}$/).withMessage('Valid mobile number is required'),
-  body('companyName').trim().notEmpty().withMessage('Company name is required'),
-  body('companyAddress').trim().notEmpty().withMessage('Company address is required'),
-  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-  body('confirmPassword').custom((value, { req }) => {
-    if (value !== req.body.password) {
-      throw new Error('Passwords do not match');
-    }
-    return true;
-  })
-];
-
-const updateUserValidation = [
-  body('firstName').optional().trim().notEmpty().withMessage('First name cannot be empty'),
-  body('lastName').optional().trim().notEmpty().withMessage('Last name cannot be empty'),
-  body('email').optional().isEmail().withMessage('Valid email is required'),
-  body('mobile').optional().matches(/^[0-9]{10,15}$/).withMessage('Valid mobile number is required'),
-  body('companyName').optional().trim().notEmpty().withMessage('Company name cannot be empty'),
-  body('companyAddress').optional().trim().notEmpty().withMessage('Company address cannot be empty'),
-  body('password').optional().isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-  body('confirmPassword').optional().custom((value, { req }) => {
-    if (req.body.password && value !== req.body.password) {
-      throw new Error('Passwords do not match');
-    }
-    return true;
-  })
-];
 
 // All routes require authentication
 router.use(protect);
 
-// User statistics - must come before /:id route
+// ==================== ADMIN USER MANAGEMENT API ENDPOINTS ====================
+
+// @route   GET /api/admin/users/stats
+// @desc    Get user statistics (total users, approved, pending, etc.)
+// @access  Private (Admin only)
 router.get('/stats', userController.getUserStats);
 
-// CRUD routes
-router.post('/', userValidation, userController.createUser);
-router.get('/', userController.getAllUsers);
-router.get('/:id', userController.getUserById);
-router.put('/:id', updateUserValidation, userController.updateUser);
-router.delete('/:id', userController.deleteUser);
+// @route   POST /api/admin/users/create
+// @desc    Create a new user
+// @access  Private (Admin only)
+router.post('/create', userCreationValidation, userController.createUser);
 
-// Toggle approval
-router.patch('/:id/approval', userController.toggleUserApproval);
+// @route   GET /api/admin/users/list
+// @desc    Get all users with pagination and filtering
+// @access  Private (Admin only)
+router.get('/list', userController.getAllUsers);
 
-// Manual email verification (admin action)
-router.patch('/:id/verify-email', userController.manuallyVerifyUser);
+// @route   GET /api/admin/users/get/:id
+// @desc    Get user by ID
+// @access  Private (Admin only)
+router.get('/get/:id', userIdValidation, userController.getUserById);
+
+// @route   PUT /api/admin/users/update/:id
+// @desc    Update user by ID
+// @access  Private (Admin only)
+router.put('/update/:id', userUpdateValidation, userController.updateUser);
+
+// @route   DELETE /api/admin/users/delete/:id
+// @desc    Delete user by ID
+// @access  Private (Admin only)
+router.delete('/delete/:id', userIdValidation, userController.deleteUser);
+
+// @route   PATCH /api/admin/users/:id/toggle-approval
+// @desc    Toggle user approval status
+// @access  Private (Admin only)
+router.patch('/:id/toggle-approval', userApprovalValidation, userController.toggleUserApproval);
+
+// @route   PATCH /api/admin/users/:id/verify-email
+// @desc    Manual email verification (admin action)
+// @access  Private (Admin only)
+router.patch('/:id/verify-email', emailVerificationValidation, userController.manuallyVerifyUser);
 
 module.exports = router;

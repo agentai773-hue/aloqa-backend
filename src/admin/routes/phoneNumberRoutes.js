@@ -9,22 +9,34 @@ const {
   getAssignedPhoneNumbers
 } = require('../controllers/phoneNumberController');
 
-// All routes require admin authentication
+// Apply authentication middleware to all routes
 router.use(protect);
 
-// Get purchased phone numbers from Bolna
-router.get('/purchased', getPurchasedPhoneNumbers);
+// ==================== ADMIN PHONE NUMBER API ENDPOINTS ====================
 
-// Search available phone numbers from Bolna
+// @route   GET /api/admin/phone-numbers/list/purchased
+// @desc    Get purchased phone numbers from Bolna
+// @access  Private (Admin only)
+router.get('/list/purchased', getPurchasedPhoneNumbers);
+
+// @route   GET /api/admin/phone-numbers/search
+// @desc    Search available phone numbers from Bolna
+// @access  Private (Admin only)
 router.get('/search', searchPhoneNumbers);
 
-// Buy a phone number from Bolna
+// @route   POST /api/admin/phone-numbers/buy
+// @desc    Buy a phone number from Bolna
+// @access  Private (Admin only)
 router.post('/buy', buyPhoneNumber);
 
-// Assign phone number to user
+// @route   POST /api/admin/phone-numbers/assign
+// @desc    Assign phone number to user
+// @access  Private (Admin only)
 router.post('/assign', assignPhoneNumber);
 
-// Get assigned phone numbers
-router.get('/assigned', getAssignedPhoneNumbers);
+// @route   GET /api/admin/phone-numbers/list/assigned
+// @desc    Get assigned phone numbers
+// @access  Private (Admin only)
+router.get('/list/assigned', getAssignedPhoneNumbers);
 
 module.exports = router;

@@ -7,7 +7,7 @@ const assistantRoutes = require('../../admin/routes/assistantRoutes');
 const phoneNumberRoutes = require('../../admin/routes/phoneNumberRoutes');
 const voiceRoutes = require('../../admin/routes/voiceRoutes');
 const assignUserVoiceRoutes = require('../../admin/routes/assignUserVoiceRoutes');
-// const callRoutes = require('../../admin/routes/callRoutes');
+const callRoutes = require('../../admin/routes/callRoutes');
 
 const router = express.Router();
 
@@ -22,6 +22,6 @@ router.use('/assistants', assistantRoutes);
 router.use('/phone-numbers', phoneNumberRoutes);
 router.use('/voices', voiceRoutes);
 router.use('/assign-user-voice', assignUserVoiceRoutes);
-// router.use('/calls', callRoutes);
+router.use('/calls', callRoutes);
 
 module.exports = router;
