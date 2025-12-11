@@ -25,19 +25,30 @@ const allowedOrigins = [
   'http://localhost:5173',        // Admin Panel (Dev)
   'http://127.0.0.1:5173',        
   'https://aloqa-admin-panel-frontend.vercel.app', // Admin Panel (Prod)
+  'http://localhost:3000',        // Client Frontend (Dev)
   'http://localhost:8080',
   'http://localhost:8081',
-  process.env.ADMIN_FRONTEND_URL
+  process.env.ADMIN_FRONTEND_URL,
+  process.env.CLIENT_FRONTEND_URL
 ].filter(Boolean);
 
 app.use(cors({
   origin: function (origin, callback) {
+    console.log('🌐 CORS Origin Check:', origin); // Debug log
+    
     if (!origin) return callback(null, true); // Allow non-browser requests
     
     if (allowedOrigins.indexOf(origin) !== -1) {
+      console.log('✅ CORS Allowed:', origin);
       callback(null, true);
     } else {
-      callback(null, true); // Allow all in development
+      console.log('❌ CORS Blocked:', origin, 'Allowed:', allowedOrigins);
+      // In development, allow all origins for easier testing
+      if (process.env.NODE_ENV === 'development') {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
     }
   },
   credentials: true,
